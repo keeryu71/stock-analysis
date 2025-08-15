@@ -672,7 +672,7 @@ CHART_TEMPLATE = """
 <body>
     <div class="container">
         <div class="header">
-            <a href="/" class="back-btn">← Back</a>
+            <a href="javascript:history.back()" class="back-btn">← Back</a>
             <h1>📊 {{ symbol }} Chart</h1>
             <p>Technical Analysis with Fibonacci, RSI, Volume & Entry Points</p>
         </div>
