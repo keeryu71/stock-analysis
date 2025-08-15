@@ -18,6 +18,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 
 from stock_config import get_stock_list
+from robinhood_data_fetcher import RobinhoodStockAnalyzer
 from hybrid_stock_analyzer import HybridStockAnalyzer, HybridOptionsAnalyzer
 
 app = Flask(__name__)
@@ -235,7 +236,7 @@ MOBILE_TEMPLATE = """
         <div id="results" class="results"></div>
         
         <div class="footer">
-            <p>🔄 Tap refresh to update • Data from Yahoo Finance</p>
+            <p>🔄 Tap refresh to update • 24/7 Data from Robinhood & Yahoo Finance</p>
         </div>
     </div>
 
@@ -305,25 +306,29 @@ MOBILE_TEMPLATE = """
             let html = '<h3 style="margin-bottom: 15px;">📊 Stock Analysis Results</h3>';
             
             if (data.results && data.results.length > 0) {
-                // Count real vs mock data
-                let realCount = 0;
-                let mockCount = 0;
+                // Count data sources
+                let robinhoodCount = 0;
+                let yahooCount = 0;
+                let otherCount = 0;
+                
                 data.results.forEach(stock => {
-                    if (stock.data_source === 'real_price') realCount++;
-                    else mockCount++;
+                    if (stock.data_source === 'robinhood_24h') robinhoodCount++;
+                    else if (stock.data_source === 'real_price') yahooCount++;
+                    else otherCount++;
                 });
                 
                 // Add data source info
-                if (realCount > 0 && mockCount > 0) {
-                    html += `<p style="font-size: 12px; color: #666; margin-bottom: 10px;">
-                        📡 ${realCount} real prices, ${mockCount} demo data</p>`;
-                } else if (realCount > 0) {
-                    html += `<p style="font-size: 12px; color: #4CAF50; margin-bottom: 10px;">
-                        📡 All prices are real-time</p>`;
+                let statusText = '';
+                if (robinhoodCount > 0) {
+                    statusText = `🏦 ${robinhoodCount} from Robinhood (24/7)`;
+                    if (yahooCount > 0) statusText += `, ${yahooCount} from Yahoo Finance`;
+                } else if (yahooCount > 0) {
+                    statusText = `📡 ${yahooCount} from Yahoo Finance`;
                 } else {
-                    html += `<p style="font-size: 12px; color: #FF9800; margin-bottom: 10px;">
-                        📡 Demo data (market closed)</p>`;
+                    statusText = `⚠️ Limited data available`;
                 }
+                
+                html += `<p style="font-size: 12px; color: #4CAF50; margin-bottom: 10px;">${statusText}</p>`;
                 
                 data.results.forEach(stock => {
                     const signalClass = stock.score >= 0.8 ? 'signal-buy' :
@@ -331,12 +336,31 @@ MOBILE_TEMPLATE = """
                     const signalText = stock.score >= 0.8 ? '🚀 STRONG BUY' :
                                       stock.score >= 0.6 ? '⚡ GOOD SETUP' : '⏳ WAIT';
                     
-                    const dataIcon = stock.data_source === 'real_price' ? '📡' : '🎯';
+                    // Icon based on data source
+                    let dataIcon = '📡';
+                    if (stock.data_source === 'robinhood_24h') {
+                        dataIcon = '🏦';
+                    } else if (stock.data_source === 'real_price') {
+                        dataIcon = '📡';
+                    }
+                    
+                    // Add market status for Robinhood data
+                    let marketStatus = '';
+                    if (stock.market_status && stock.market_status !== 'unknown') {
+                        const statusEmoji = {
+                            'regular_hours': '🟢',
+                            'pre_market': '🟡',
+                            'after_hours': '🟠',
+                            'weekend': '🔴',
+                            'closed': '🔴'
+                        };
+                        marketStatus = ` ${statusEmoji[stock.market_status] || '⚪'}`;
+                    }
                     
                     html += `
                         <div class="stock-card">
                             <div class="stock-header">
-                                <span class="stock-symbol">${dataIcon} ${stock.symbol}</span>
+                                <span class="stock-symbol">${dataIcon} ${stock.symbol}${marketStatus}</span>
                                 <span class="stock-price">$${stock.price.toFixed(2)}</span>
                             </div>
                             <div class="signal ${signalClass}">${signalText} (${(stock.score * 100).toFixed(0)}%)</div>
@@ -434,12 +458,26 @@ def index():
 def api_stock_analysis():
     """API endpoint for stock analysis."""
     try:
-        print("🔍 Starting hybrid stock analysis...")
-        analyzer = HybridStockAnalyzer()
-        print("✅ HybridStockAnalyzer initialized")
+        print("🔍 Starting 24/7 stock analysis...")
         
-        results = analyzer.run_analysis()
-        print(f"✅ Hybrid analysis complete, got {len(results)} results")
+        # Try Robinhood first for 24/7 data
+        try:
+            rh_analyzer = RobinhoodStockAnalyzer()
+            print("✅ RobinhoodStockAnalyzer initialized")
+            results = rh_analyzer.run_analysis()
+            print(f"✅ Robinhood analysis complete, got {len(results)} results")
+            
+            # If we got good results from Robinhood, use them
+            if results and len(results) >= 5:  # At least 5 stocks
+                print("🎯 Using Robinhood 24/7 data")
+            else:
+                raise Exception("Insufficient Robinhood data")
+                
+        except Exception as e:
+            print(f"⚠️ Robinhood failed ({e}), falling back to Yahoo Finance...")
+            analyzer = HybridStockAnalyzer()
+            results = analyzer.run_analysis()
+            print(f"✅ Yahoo Finance fallback complete, got {len(results)} results")
         
         # Format results for mobile
         mobile_results = []
@@ -450,7 +488,10 @@ def api_stock_analysis():
                 'score': result.get('score', 0),
                 'rsi': result.get('rsi', 0),
                 'volume_ratio': result.get('volume_ratio', 0),
-                'top_entries': result.get('top_entries', [])
+                'top_entries': result.get('top_entries', []),
+                'data_source': result.get('data_source', 'unknown'),
+                'market_status': result.get('market_status', 'unknown'),
+                'price_source': result.get('price_source', 'unknown')
             })
         
         print(f"✅ Formatted {len(mobile_results)} results for mobile")
@@ -631,6 +672,38 @@ def api_test_hybrid():
             'message': 'Hybrid analyzers test (real prices + calculated indicators)',
             'stock_result': stock_result,
             'options_result': options_result,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+@app.route('/api/test-robinhood')
+def api_test_robinhood():
+    """Test the Robinhood analyzer directly."""
+    try:
+        from robinhood_data_fetcher import RobinhoodStockAnalyzer, RobinhoodDataFetcher
+        
+        # Test Robinhood data fetcher
+        fetcher = RobinhoodDataFetcher()
+        quote_result = fetcher.get_quote_data('TSLA')
+        
+        # Test Robinhood analyzer
+        analyzer = RobinhoodStockAnalyzer()
+        if quote_result:
+            analysis_result = analyzer.analyze_stock_from_robinhood(quote_result)
+        else:
+            analysis_result = None
+        
+        return jsonify({
+            'success': True,
+            'message': 'Robinhood 24/7 analyzer test',
+            'quote_result': quote_result,
+            'analysis_result': analysis_result,
             'timestamp': datetime.now().isoformat()
         })
     except Exception as e:
