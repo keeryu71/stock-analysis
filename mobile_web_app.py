@@ -18,8 +18,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 
 from stock_config import get_stock_list
-from multi_stock_alerts import MultiStockAlerts
-from real_time_options_analyzer import RealTimeOptionsAnalyzer
+from simple_stock_analyzer import SimpleStockAnalyzer, SimpleOptionsAnalyzer
 
 app = Flask(__name__)
 
@@ -391,9 +390,9 @@ def index():
 def api_stock_analysis():
     """API endpoint for stock analysis."""
     try:
-        print("🔍 Starting stock analysis...")
-        analyzer = MultiStockAlerts()
-        print("✅ MultiStockAlerts initialized")
+        print("🔍 Starting simplified stock analysis...")
+        analyzer = SimpleStockAnalyzer()
+        print("✅ SimpleStockAnalyzer initialized")
         
         results = analyzer.run_analysis()
         print(f"✅ Analysis complete, got {len(results)} results")
@@ -435,9 +434,9 @@ def api_stock_analysis():
 def api_options_analysis():
     """API endpoint for options analysis."""
     try:
-        print("🔍 Starting options analysis...")
-        analyzer = RealTimeOptionsAnalyzer()
-        print("✅ RealTimeOptionsAnalyzer initialized")
+        print("🔍 Starting simplified options analysis...")
+        analyzer = SimpleOptionsAnalyzer()
+        print("✅ SimpleOptionsAnalyzer initialized")
         
         results = analyzer.run_real_time_analysis()
         print(f"✅ Options analysis complete, got {len(results)} results")
