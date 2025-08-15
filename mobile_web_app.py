@@ -349,17 +349,24 @@ MOBILE_TEMPLATE = """
                         dataIcon = '📡';
                     }
                     
-                    // Add market status
-                    let marketStatus = '';
-                    if (stock.market_status && stock.market_status !== 'unknown') {
-                        const statusEmoji = {
-                            'regular_hours': '🟢',
-                            'pre_market': '🟡',
-                            'after_hours': '🟠',
-                            'weekend': '🔴',
-                            'closed': '🔴'
-                        };
-                        marketStatus = ` ${statusEmoji[stock.market_status] || '⚪'}`;
+                    // RSI-based color indicator (more useful than market status)
+                    let rsiIndicator = '';
+                    if (stock.rsi !== undefined) {
+                        if (stock.rsi < 20) {
+                            rsiIndicator = ' 🔴'; // Very oversold - extreme
+                        } else if (stock.rsi < 30) {
+                            rsiIndicator = ' 🟠'; // Oversold - potential buy opportunity
+                        } else if (stock.rsi <= 50) {
+                            rsiIndicator = ' 🟢'; // Healthy range - good
+                        } else if (stock.rsi <= 70) {
+                            rsiIndicator = ' 🟡'; // Slightly overbought - caution
+                        } else if (stock.rsi <= 80) {
+                            rsiIndicator = ' 🟠'; // Overbought - warning
+                        } else {
+                            rsiIndicator = ' 🔴'; // Very overbought - avoid
+                        }
+                    } else {
+                        rsiIndicator = ' ⚪'; // No RSI data
                     }
                     
                     // RSI trend emoji
@@ -394,7 +401,7 @@ MOBILE_TEMPLATE = """
                         <div class="stock-card">
                             <div class="stock-header">
                                 <span class="stock-symbol">
-                                    ${dataIcon} ${stock.symbol}${marketStatus}
+                                    ${dataIcon} ${stock.symbol}${rsiIndicator}
                                     <a href="/chart/${stock.symbol}"
                                        style="margin-left: 8px; text-decoration: none;
                                               background: #4CAF50; color: white; padding: 4px 8px;
