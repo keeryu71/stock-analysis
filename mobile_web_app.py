@@ -491,6 +491,54 @@ def api_test():
             'error': str(e)
         }), 500
 
+@app.route('/api/test-stock')
+def api_test_stock():
+    """Test the simplified stock analyzer directly."""
+    try:
+        from simple_stock_analyzer import SimpleStockAnalyzer
+        analyzer = SimpleStockAnalyzer()
+        
+        # Test with just TSLA
+        result = analyzer.analyze_stock('TSLA')
+        
+        return jsonify({
+            'success': True,
+            'message': 'Stock analyzer test',
+            'result': result,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+@app.route('/api/test-options')
+def api_test_options():
+    """Test the simplified options analyzer directly."""
+    try:
+        from simple_stock_analyzer import SimpleOptionsAnalyzer
+        analyzer = SimpleOptionsAnalyzer()
+        
+        # Test with just TSLA
+        result = analyzer.get_basic_options_data('TSLA')
+        
+        return jsonify({
+            'success': True,
+            'message': 'Options analyzer test',
+            'result': result,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
 def open_browser():
     """Open browser after a short delay."""
     time.sleep(1.5)
