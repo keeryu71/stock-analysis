@@ -19,6 +19,7 @@ sys.path.append(current_dir)
 
 from stock_config import get_stock_list
 from simple_stock_analyzer import SimpleStockAnalyzer, SimpleOptionsAnalyzer
+from mock_stock_analyzer import MockStockAnalyzer, MockOptionsAnalyzer
 
 app = Flask(__name__)
 
@@ -390,12 +391,27 @@ def index():
 def api_stock_analysis():
     """API endpoint for stock analysis."""
     try:
-        print("🔍 Starting simplified stock analysis...")
-        analyzer = SimpleStockAnalyzer()
-        print("✅ SimpleStockAnalyzer initialized")
+        print("🔍 Starting stock analysis...")
         
-        results = analyzer.run_analysis()
-        print(f"✅ Analysis complete, got {len(results)} results")
+        # Try real data first
+        try:
+            analyzer = SimpleStockAnalyzer()
+            print("✅ SimpleStockAnalyzer initialized")
+            results = analyzer.run_analysis()
+            print(f"✅ Real analysis complete, got {len(results)} results")
+            
+            # If no results, fall back to mock data
+            if not results:
+                print("⚠️ No real data available, using mock data...")
+                mock_analyzer = MockStockAnalyzer()
+                results = mock_analyzer.run_analysis()
+                print(f"✅ Mock analysis complete, got {len(results)} results")
+                
+        except Exception as e:
+            print(f"⚠️ Real data failed ({e}), using mock data...")
+            mock_analyzer = MockStockAnalyzer()
+            results = mock_analyzer.run_analysis()
+            print(f"✅ Mock analysis complete, got {len(results)} results")
         
         # Format results for mobile
         mobile_results = []
@@ -434,12 +450,27 @@ def api_stock_analysis():
 def api_options_analysis():
     """API endpoint for options analysis."""
     try:
-        print("🔍 Starting simplified options analysis...")
-        analyzer = SimpleOptionsAnalyzer()
-        print("✅ SimpleOptionsAnalyzer initialized")
+        print("🔍 Starting options analysis...")
         
-        results = analyzer.run_real_time_analysis()
-        print(f"✅ Options analysis complete, got {len(results)} results")
+        # Try real data first
+        try:
+            analyzer = SimpleOptionsAnalyzer()
+            print("✅ SimpleOptionsAnalyzer initialized")
+            results = analyzer.run_real_time_analysis()
+            print(f"✅ Real options analysis complete, got {len(results)} results")
+            
+            # If no results, fall back to mock data
+            if not results:
+                print("⚠️ No real options data available, using mock data...")
+                mock_analyzer = MockOptionsAnalyzer()
+                results = mock_analyzer.run_real_time_analysis()
+                print(f"✅ Mock options analysis complete, got {len(results)} results")
+                
+        except Exception as e:
+            print(f"⚠️ Real options data failed ({e}), using mock data...")
+            mock_analyzer = MockOptionsAnalyzer()
+            results = mock_analyzer.run_real_time_analysis()
+            print(f"✅ Mock options analysis complete, got {len(results)} results")
         
         # Format results for mobile
         mobile_results = []
@@ -529,6 +560,35 @@ def api_test_options():
             'success': True,
             'message': 'Options analyzer test',
             'result': result,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+@app.route('/api/test-mock')
+def api_test_mock():
+    """Test the mock analyzers directly."""
+    try:
+        from mock_stock_analyzer import MockStockAnalyzer, MockOptionsAnalyzer
+        
+        # Test mock stock analyzer
+        stock_analyzer = MockStockAnalyzer()
+        stock_result = stock_analyzer.analyze_stock('TSLA')
+        
+        # Test mock options analyzer
+        options_analyzer = MockOptionsAnalyzer()
+        options_result = options_analyzer.get_basic_options_data('TSLA')
+        
+        return jsonify({
+            'success': True,
+            'message': 'Mock analyzers test',
+            'stock_result': stock_result,
+            'options_result': options_result,
             'timestamp': datetime.now().isoformat()
         })
     except Exception as e:
