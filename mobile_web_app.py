@@ -367,10 +367,23 @@ MOBILE_TEMPLATE = """
                         rsiIndicator = ' ⚪'; // No RSI data
                     }
                     
-                    // RSI trend emoji
-                    const rsiEmoji = stock.rsi_trend === 'Oversold' ? '🟢' :
-                                    stock.rsi_trend === 'Healthy' ? '🟡' :
-                                    stock.rsi_trend === 'Overbought' ? '🟠' : '🔴';
+                    // RSI trend emoji - match the circle indicator logic
+                    let rsiEmoji = '⚪'; // Default
+                    if (stock.rsi !== undefined) {
+                        if (stock.rsi < 20) {
+                            rsiEmoji = '🔴'; // Very oversold - extreme
+                        } else if (stock.rsi < 30) {
+                            rsiEmoji = '🟠'; // Oversold - potential buy opportunity
+                        } else if (stock.rsi <= 50) {
+                            rsiEmoji = '🟢'; // Healthy range - good
+                        } else if (stock.rsi <= 70) {
+                            rsiEmoji = '🟡'; // Slightly overbought - caution
+                        } else if (stock.rsi <= 80) {
+                            rsiEmoji = '🟠'; // Overbought - warning
+                        } else {
+                            rsiEmoji = '🔴'; // Very overbought - avoid
+                        }
+                    }
                     
                     // Volume trend emoji
                     const volumeEmoji = stock.volume_trend === 'Strong' ? '🔥' :
