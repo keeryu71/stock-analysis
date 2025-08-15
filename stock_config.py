@@ -5,24 +5,71 @@ Centralized Stock Configuration
 Single source of truth for all stock lists across analysis systems
 """
 
-# MASTER STOCK LIST - UPDATE ONLY HERE
+# TOP 50 POPULAR STOCKS - MASTER LIST
 STOCK_LIST = [
-    'TSLA',   # Tesla
-    'AMD',    # Advanced Micro Devices
-    'BMNR',   # Biomerica
-    'SBET',   # SharpLink Gaming
-    'MSTR',   # MicroStrategy
-    'HIMS',   # Hims & Hers Health
-    'PLTR',   # Palantir
-    'AVGO',   # Broadcom
+    # Mega Cap Tech (FAANG+)
+    'AAPL',   # Apple
+    'MSFT',   # Microsoft
+    'GOOGL',  # Google/Alphabet
+    'AMZN',   # Amazon
     'NVDA',   # NVIDIA
+    'META',   # Meta (Facebook)
+    'TSLA',   # Tesla
+    
+    # Large Cap Tech
+    'NFLX',   # Netflix
+    'AMD',    # Advanced Micro Devices
+    'CRM',    # Salesforce
+    'ORCL',   # Oracle
+    'ADBE',   # Adobe
+    'AVGO',   # Broadcom
+    'INTC',   # Intel
+    'QCOM',   # Qualcomm
+    
+    # Financial Services
+    'JPM',    # JPMorgan Chase
+    'BAC',    # Bank of America
+    'WFC',    # Wells Fargo
+    'GS',     # Goldman Sachs
+    'MS',     # Morgan Stanley
+    'C',      # Citigroup
+    'V',      # Visa
+    'MA',     # Mastercard
+    'PYPL',   # PayPal
+    
+    # Healthcare & Pharma
+    'JNJ',    # Johnson & Johnson
+    'PFE',    # Pfizer
+    'UNH',    # UnitedHealth Group
+    'ABBV',   # AbbVie
+    'MRK',    # Merck
+    'TMO',    # Thermo Fisher Scientific
+    'ABT',    # Abbott Laboratories
+    
+    # Consumer & Retail
+    'WMT',    # Walmart
+    'HD',     # Home Depot
+    'PG',     # Procter & Gamble
+    'KO',     # Coca-Cola
+    'PEP',    # PepsiCo
+    'NKE',    # Nike
+    'MCD',    # McDonald's
+    'SBUX',   # Starbucks
+    
+    # Energy & Industrials
+    'XOM',    # Exxon Mobil
+    'CVX',    # Chevron
+    'BA',     # Boeing
+    'CAT',    # Caterpillar
+    'GE',     # General Electric
+    
+    # Growth & Popular Stocks
+    'PLTR',   # Palantir
     'HOOD',   # Robinhood
     'COIN',   # Coinbase
-    'OSCR',   # Oscar Health
-    'GOOG',   # Google/Alphabet
-    'UNH',    # UnitedHealth Group
-    'MSFT',   # Microsoft
-    'SOFI'    # SoFi Technologies
+    'SOFI',   # SoFi Technologies
+    'RIVN',   # Rivian
+    'LCID'    # Lucid Motors
 ]
 
 # Configuration settings

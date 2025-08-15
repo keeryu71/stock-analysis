@@ -551,8 +551,8 @@ class FreeExtendedHoursAnalyzer:
             return None
     
     def run_analysis(self):
-        """Run extended hours analysis using free APIs."""
-        print("🚀 Starting free extended hours stock analysis...")
+        """Run extended hours analysis using free APIs and return top 10 best setups."""
+        print("🚀 Starting comprehensive analysis of top 50 popular stocks...")
         
         # Get quotes from free APIs
         quotes = self.fetcher.get_all_quotes()
@@ -561,27 +561,38 @@ class FreeExtendedHoursAnalyzer:
             print("❌ No data received from free APIs")
             return []
         
+        print(f"📊 Analyzing {len(quotes)} stocks from top 50 popular list...")
+        
         # Analyze each stock
         results = []
         for quote in quotes:
             analysis = self.analyze_stock_from_quote(quote)
-            if analysis:
+            if analysis and analysis['score'] >= 0.4:  # Only include decent setups
                 results.append(analysis)
         
-        # Sort by score
+        # Sort by score (best first)
         results.sort(key=lambda x: x['score'], reverse=True)
         
-        print(f"✅ Free API analysis complete: {len(results)} stocks analyzed")
+        # Take only top 10 best setups
+        top_results = results[:10]
+        
+        print(f"✅ Analysis complete: Found {len(results)} viable setups, showing top {len(top_results)}")
         
         # Show data source summary
         source_counts = {}
-        for result in results:
+        for result in top_results:
             source = result['data_source']
             source_counts[source] = source_counts.get(source, 0) + 1
         
-        print(f"📊 Data sources: {dict(source_counts)}")
+        print(f"📊 Top 10 data sources: {dict(source_counts)}")
         
-        return results
+        # Show score distribution
+        if top_results:
+            scores = [r['score'] * 100 for r in top_results]
+            print(f"🎯 Score range: {min(scores):.0f}% - {max(scores):.0f}%")
+            print(f"🏆 Best setup: {top_results[0]['symbol']} ({top_results[0]['score']*100:.0f}%)")
+        
+        return top_results
 
 if __name__ == "__main__":
     # Test the free extended hours fetcher

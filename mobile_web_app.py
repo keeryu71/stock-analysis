@@ -222,7 +222,7 @@ MOBILE_TEMPLATE = """
         
         <div class="controls">
             <button class="btn btn-primary" onclick="runStockAnalysis()">
-                📈 Stock Analysis
+                🏆 Find Top 10 Best Setups
             </button>
             <button class="btn btn-secondary" onclick="runOptionsAnalysis()">
                 💰 Options Analysis
@@ -304,7 +304,7 @@ MOBILE_TEMPLATE = """
         }
         
         function displayStockResults(data) {
-            let html = '<h3 style="margin-bottom: 15px;">📊 Stock Analysis Results</h3>';
+            let html = '<h3 style="margin-bottom: 15px;">🏆 Top 10 Best Stock Setups</h3>';
             
             if (data.results && data.results.length > 0) {
                 // Count data sources
@@ -322,15 +322,13 @@ MOBILE_TEMPLATE = """
                     }
                 });
                 
-                // Add data source info
-                let statusText = '';
+                // Add analysis info
+                let statusText = `🔍 Analyzed top 50 popular stocks, showing ${data.results.length} best setups`;
                 if (robinhoodCount > 0) {
-                    statusText = `🆓 ${robinhoodCount} from Free APIs (24/7)`;
+                    statusText += ` • 🆓 ${robinhoodCount} from Free APIs (24/7)`;
                     if (yahooCount > 0) statusText += `, ${yahooCount} from Yahoo Finance`;
                 } else if (yahooCount > 0) {
-                    statusText = `📡 ${yahooCount} from Yahoo Finance`;
-                } else {
-                    statusText = `⚠️ Limited data available`;
+                    statusText += ` • 📡 ${yahooCount} from Yahoo Finance`;
                 }
                 
                 html += `<p style="font-size: 12px; color: #4CAF50; margin-bottom: 10px;">${statusText}</p>`;
@@ -434,7 +432,7 @@ MOBILE_TEMPLATE = """
                     `;
                 });
             } else {
-                html += '<div class="stock-card"><p>No stock data available</p></div>';
+                html += '<div class="stock-card"><p>No good setups found in top 50 stocks. Market conditions may not be favorable for trading right now.</p></div>';
             }
             
             document.getElementById('results').innerHTML = html;
