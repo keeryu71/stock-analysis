@@ -255,30 +255,50 @@ MOBILE_TEMPLATE = """
         function runStockAnalysis() {
             showLoading();
             fetch('/api/stock-analysis')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     hideLoading();
-                    displayStockResults(data);
+                    if (data.success) {
+                        displayStockResults(data);
+                    } else {
+                        document.getElementById('results').innerHTML =
+                            '<div class="stock-card"><p style="color: red;">❌ API Error: ' + data.error + '</p></div>';
+                    }
                 })
                 .catch(error => {
                     hideLoading();
-                    document.getElementById('results').innerHTML = 
-                        '<div class="stock-card"><p style="color: red;">❌ Error: ' + error.message + '</p></div>';
+                    document.getElementById('results').innerHTML =
+                        '<div class="stock-card"><p style="color: red;">❌ Network Error: ' + error.message + '</p></div>';
                 });
         }
         
         function runOptionsAnalysis() {
             showLoading();
             fetch('/api/options-analysis')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     hideLoading();
-                    displayOptionsResults(data);
+                    if (data.success) {
+                        displayOptionsResults(data);
+                    } else {
+                        document.getElementById('results').innerHTML =
+                            '<div class="stock-card"><p style="color: red;">❌ API Error: ' + data.error + '</p></div>';
+                    }
                 })
                 .catch(error => {
                     hideLoading();
-                    document.getElementById('results').innerHTML = 
-                        '<div class="stock-card"><p style="color: red;">❌ Error: ' + error.message + '</p></div>';
+                    document.getElementById('results').innerHTML =
+                        '<div class="stock-card"><p style="color: red;">❌ Network Error: ' + error.message + '</p></div>';
                 });
         }
         
@@ -371,57 +391,101 @@ def index():
 def api_stock_analysis():
     """API endpoint for stock analysis."""
     try:
+        print("🔍 Starting stock analysis...")
         analyzer = MultiStockAlerts()
+        print("✅ MultiStockAlerts initialized")
+        
         results = analyzer.run_analysis()
+        print(f"✅ Analysis complete, got {len(results)} results")
         
         # Format results for mobile
         mobile_results = []
         for result in results:
             mobile_results.append({
-                'symbol': result['symbol'],
-                'price': result['price'],
-                'score': result['score'],
-                'rsi': result['rsi'],
-                'volume_ratio': result['volume_ratio'],
-                'top_entries': result['top_entries']
+                'symbol': result.get('symbol', 'N/A'),
+                'price': result.get('price', 0),
+                'score': result.get('score', 0),
+                'rsi': result.get('rsi', 0),
+                'volume_ratio': result.get('volume_ratio', 0),
+                'top_entries': result.get('top_entries', [])
             })
+        
+        print(f"✅ Formatted {len(mobile_results)} results for mobile")
         
         return jsonify({
             'success': True,
             'results': mobile_results,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now().isoformat(),
+            'count': len(mobile_results)
         })
     
     except Exception as e:
+        error_msg = f"Stock analysis error: {str(e)}"
+        print(f"❌ {error_msg}")
+        import traceback
+        traceback.print_exc()
+        
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': error_msg,
+            'details': traceback.format_exc()
         }), 500
 
 @app.route('/api/options-analysis')
 def api_options_analysis():
     """API endpoint for options analysis."""
     try:
+        print("🔍 Starting options analysis...")
         analyzer = RealTimeOptionsAnalyzer()
+        print("✅ RealTimeOptionsAnalyzer initialized")
+        
         results = analyzer.run_real_time_analysis()
+        print(f"✅ Options analysis complete, got {len(results)} results")
         
         # Format results for mobile
         mobile_results = []
         for result in results:
             mobile_results.append({
-                'symbol': result['symbol'],
-                'current_price': result['current_price'],
-                'quality_score': result['quality_score'],
-                'put_analysis': result['put_analysis'],
-                'days_to_expiration': result['days_to_expiration']
+                'symbol': result.get('symbol', 'N/A'),
+                'current_price': result.get('current_price', 0),
+                'quality_score': result.get('quality_score', 0),
+                'put_analysis': result.get('put_analysis', []),
+                'days_to_expiration': result.get('days_to_expiration', 0)
             })
+        
+        print(f"✅ Formatted {len(mobile_results)} options results for mobile")
         
         return jsonify({
             'success': True,
             'results': mobile_results,
-            'timestamp': datetime.now().isoformat()
+            'timestamp': datetime.now().isoformat(),
+            'count': len(mobile_results)
         })
     
+    except Exception as e:
+        error_msg = f"Options analysis error: {str(e)}"
+        print(f"❌ {error_msg}")
+        import traceback
+        traceback.print_exc()
+        
+        return jsonify({
+            'success': False,
+            'error': error_msg,
+            'details': traceback.format_exc()
+        }), 500
+
+@app.route('/api/test')
+def api_test():
+    """Simple test endpoint to verify API is working."""
+    try:
+        stocks = get_stock_list()
+        return jsonify({
+            'success': True,
+            'message': 'API is working!',
+            'stock_count': len(stocks),
+            'stocks': stocks[:5],  # First 5 stocks
+            'timestamp': datetime.now().isoformat()
+        })
     except Exception as e:
         return jsonify({
             'success': False,
