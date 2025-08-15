@@ -18,8 +18,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 
 from stock_config import get_stock_list
-from simple_stock_analyzer import SimpleStockAnalyzer, SimpleOptionsAnalyzer
-from mock_stock_analyzer import MockStockAnalyzer, MockOptionsAnalyzer
+from hybrid_stock_analyzer import HybridStockAnalyzer, HybridOptionsAnalyzer
 
 app = Flask(__name__)
 
@@ -306,23 +305,45 @@ MOBILE_TEMPLATE = """
             let html = '<h3 style="margin-bottom: 15px;">📊 Stock Analysis Results</h3>';
             
             if (data.results && data.results.length > 0) {
+                // Count real vs mock data
+                let realCount = 0;
+                let mockCount = 0;
                 data.results.forEach(stock => {
-                    const signalClass = stock.score >= 0.8 ? 'signal-buy' : 
+                    if (stock.data_source === 'real_price') realCount++;
+                    else mockCount++;
+                });
+                
+                // Add data source info
+                if (realCount > 0 && mockCount > 0) {
+                    html += `<p style="font-size: 12px; color: #666; margin-bottom: 10px;">
+                        📡 ${realCount} real prices, ${mockCount} demo data</p>`;
+                } else if (realCount > 0) {
+                    html += `<p style="font-size: 12px; color: #4CAF50; margin-bottom: 10px;">
+                        📡 All prices are real-time</p>`;
+                } else {
+                    html += `<p style="font-size: 12px; color: #FF9800; margin-bottom: 10px;">
+                        📡 Demo data (market closed)</p>`;
+                }
+                
+                data.results.forEach(stock => {
+                    const signalClass = stock.score >= 0.8 ? 'signal-buy' :
                                        stock.score >= 0.6 ? 'signal-hold' : 'signal-sell';
-                    const signalText = stock.score >= 0.8 ? '🚀 STRONG BUY' : 
+                    const signalText = stock.score >= 0.8 ? '🚀 STRONG BUY' :
                                       stock.score >= 0.6 ? '⚡ GOOD SETUP' : '⏳ WAIT';
+                    
+                    const dataIcon = stock.data_source === 'real_price' ? '📡' : '🎯';
                     
                     html += `
                         <div class="stock-card">
                             <div class="stock-header">
-                                <span class="stock-symbol">${stock.symbol}</span>
+                                <span class="stock-symbol">${dataIcon} ${stock.symbol}</span>
                                 <span class="stock-price">$${stock.price.toFixed(2)}</span>
                             </div>
                             <div class="signal ${signalClass}">${signalText} (${(stock.score * 100).toFixed(0)}%)</div>
                             <div class="stock-details">
-                                RSI: ${stock.rsi.toFixed(0)} • 
-                                Volume: ${stock.volume_ratio.toFixed(1)}x • 
-                                ${stock.top_entries.length > 0 ? 
+                                RSI: ${stock.rsi.toFixed(0)} •
+                                Volume: ${stock.volume_ratio.toFixed(1)}x •
+                                ${stock.top_entries.length > 0 ?
                                   `Entry: $${stock.top_entries[0].price.toFixed(2)}` : 'No entry'}
                             </div>
                         </div>
@@ -339,22 +360,44 @@ MOBILE_TEMPLATE = """
             let html = '<h3 style="margin-bottom: 15px;">💰 Options Analysis Results</h3>';
             
             if (data.results && data.results.length > 0) {
+                // Count real vs mock options data
+                let realCount = 0;
+                let mockCount = 0;
+                data.results.forEach(stock => {
+                    if (stock.data_source === 'real_options') realCount++;
+                    else mockCount++;
+                });
+                
+                // Add data source info
+                if (realCount > 0 && mockCount > 0) {
+                    html += `<p style="font-size: 12px; color: #666; margin-bottom: 10px;">
+                        📡 ${realCount} real options, ${mockCount} demo data</p>`;
+                } else if (realCount > 0) {
+                    html += `<p style="font-size: 12px; color: #4CAF50; margin-bottom: 10px;">
+                        📡 All options are real-time</p>`;
+                } else {
+                    html += `<p style="font-size: 12px; color: #FF9800; margin-bottom: 10px;">
+                        📡 Demo options data (market closed)</p>`;
+                }
+                
                 data.results.forEach(stock => {
                     if (stock.put_analysis && stock.put_analysis.length > 0) {
                         const bestPut = stock.put_analysis[0];
                         const qualityStars = '⭐'.repeat(Math.ceil(stock.quality_score * 5));
                         
+                        const dataIcon = stock.data_source === 'real_options' ? '📡' : '🎯';
+                        
                         html += `
                             <div class="stock-card">
                                 <div class="stock-header">
-                                    <span class="stock-symbol">${stock.symbol}</span>
+                                    <span class="stock-symbol">${dataIcon} ${stock.symbol}</span>
                                     <span class="stock-price">$${stock.current_price.toFixed(2)}</span>
                                 </div>
                                 <div class="stock-details">
                                     <strong>Best Put: $${bestPut.strike.toFixed(2)}</strong><br>
-                                    Premium: $${bestPut.bid.toFixed(2)} • 
+                                    Premium: $${bestPut.bid.toFixed(2)} •
                                     Return: ${(bestPut.annualized_return * 100).toFixed(1)}%<br>
-                                    Quality: ${qualityStars} • 
+                                    Quality: ${qualityStars} •
                                     Days: ${bestPut.days_to_exp}d
                                 </div>
                             </div>
@@ -391,27 +434,12 @@ def index():
 def api_stock_analysis():
     """API endpoint for stock analysis."""
     try:
-        print("🔍 Starting stock analysis...")
+        print("🔍 Starting hybrid stock analysis...")
+        analyzer = HybridStockAnalyzer()
+        print("✅ HybridStockAnalyzer initialized")
         
-        # Try real data first
-        try:
-            analyzer = SimpleStockAnalyzer()
-            print("✅ SimpleStockAnalyzer initialized")
-            results = analyzer.run_analysis()
-            print(f"✅ Real analysis complete, got {len(results)} results")
-            
-            # If no results, fall back to mock data
-            if not results:
-                print("⚠️ No real data available, using mock data...")
-                mock_analyzer = MockStockAnalyzer()
-                results = mock_analyzer.run_analysis()
-                print(f"✅ Mock analysis complete, got {len(results)} results")
-                
-        except Exception as e:
-            print(f"⚠️ Real data failed ({e}), using mock data...")
-            mock_analyzer = MockStockAnalyzer()
-            results = mock_analyzer.run_analysis()
-            print(f"✅ Mock analysis complete, got {len(results)} results")
+        results = analyzer.run_analysis()
+        print(f"✅ Hybrid analysis complete, got {len(results)} results")
         
         # Format results for mobile
         mobile_results = []
@@ -450,27 +478,12 @@ def api_stock_analysis():
 def api_options_analysis():
     """API endpoint for options analysis."""
     try:
-        print("🔍 Starting options analysis...")
+        print("🔍 Starting hybrid options analysis...")
+        analyzer = HybridOptionsAnalyzer()
+        print("✅ HybridOptionsAnalyzer initialized")
         
-        # Try real data first
-        try:
-            analyzer = SimpleOptionsAnalyzer()
-            print("✅ SimpleOptionsAnalyzer initialized")
-            results = analyzer.run_real_time_analysis()
-            print(f"✅ Real options analysis complete, got {len(results)} results")
-            
-            # If no results, fall back to mock data
-            if not results:
-                print("⚠️ No real options data available, using mock data...")
-                mock_analyzer = MockOptionsAnalyzer()
-                results = mock_analyzer.run_real_time_analysis()
-                print(f"✅ Mock options analysis complete, got {len(results)} results")
-                
-        except Exception as e:
-            print(f"⚠️ Real options data failed ({e}), using mock data...")
-            mock_analyzer = MockOptionsAnalyzer()
-            results = mock_analyzer.run_real_time_analysis()
-            print(f"✅ Mock options analysis complete, got {len(results)} results")
+        results = analyzer.run_real_time_analysis()
+        print(f"✅ Hybrid options analysis complete, got {len(results)} results")
         
         # Format results for mobile
         mobile_results = []
@@ -587,6 +600,35 @@ def api_test_mock():
         return jsonify({
             'success': True,
             'message': 'Mock analyzers test',
+            'stock_result': stock_result,
+            'options_result': options_result,
+            'timestamp': datetime.now().isoformat()
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
+@app.route('/api/test-hybrid')
+def api_test_hybrid():
+    """Test the hybrid analyzers directly."""
+    try:
+        from hybrid_stock_analyzer import HybridStockAnalyzer, HybridOptionsAnalyzer
+        
+        # Test hybrid stock analyzer
+        stock_analyzer = HybridStockAnalyzer()
+        stock_result = stock_analyzer.analyze_stock('TSLA')
+        
+        # Test hybrid options analyzer
+        options_analyzer = HybridOptionsAnalyzer()
+        options_result = options_analyzer.get_real_options_data('TSLA')
+        
+        return jsonify({
+            'success': True,
+            'message': 'Hybrid analyzers test (real prices + calculated indicators)',
             'stock_result': stock_result,
             'options_result': options_result,
             'timestamp': datetime.now().isoformat()
