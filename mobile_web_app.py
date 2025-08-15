@@ -18,7 +18,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 
 from stock_config import get_stock_list
-from robinhood_data_fetcher import RobinhoodStockAnalyzer
+from free_extended_hours_fetcher import FreeExtendedHoursAnalyzer
 from hybrid_stock_analyzer import HybridStockAnalyzer, HybridOptionsAnalyzer
 
 app = Flask(__name__)
@@ -236,7 +236,7 @@ MOBILE_TEMPLATE = """
         <div id="results" class="results"></div>
         
         <div class="footer">
-            <p>🔄 Tap refresh to update • 24/7 Data from Robinhood & Yahoo Finance</p>
+            <p>🔄 Tap refresh to update • 24/7 Data from Free APIs (Yahoo, Finnhub, Alpha Vantage)</p>
         </div>
     </div>
 
@@ -312,15 +312,19 @@ MOBILE_TEMPLATE = """
                 let otherCount = 0;
                 
                 data.results.forEach(stock => {
-                    if (stock.data_source === 'robinhood_24h') robinhoodCount++;
-                    else if (stock.data_source === 'real_price') yahooCount++;
-                    else otherCount++;
+                    if (stock.data_source && stock.data_source.startsWith('free_api_')) {
+                        robinhoodCount++; // Reuse counter for free APIs
+                    } else if (stock.data_source === 'real_price') {
+                        yahooCount++;
+                    } else {
+                        otherCount++;
+                    }
                 });
                 
                 // Add data source info
                 let statusText = '';
                 if (robinhoodCount > 0) {
-                    statusText = `🏦 ${robinhoodCount} from Robinhood (24/7)`;
+                    statusText = `🆓 ${robinhoodCount} from Free APIs (24/7)`;
                     if (yahooCount > 0) statusText += `, ${yahooCount} from Yahoo Finance`;
                 } else if (yahooCount > 0) {
                     statusText = `📡 ${yahooCount} from Yahoo Finance`;
@@ -338,8 +342,8 @@ MOBILE_TEMPLATE = """
                     
                     // Icon based on data source
                     let dataIcon = '📡';
-                    if (stock.data_source === 'robinhood_24h') {
-                        dataIcon = '🏦';
+                    if (stock.data_source && stock.data_source.startsWith('free_api_')) {
+                        dataIcon = '🆓';
                     } else if (stock.data_source === 'real_price') {
                         dataIcon = '📡';
                     }
@@ -460,21 +464,21 @@ def api_stock_analysis():
     try:
         print("🔍 Starting 24/7 stock analysis...")
         
-        # Try Robinhood first for 24/7 data
+        # Try free extended hours APIs first
         try:
-            rh_analyzer = RobinhoodStockAnalyzer()
-            print("✅ RobinhoodStockAnalyzer initialized")
-            results = rh_analyzer.run_analysis()
-            print(f"✅ Robinhood analysis complete, got {len(results)} results")
+            free_analyzer = FreeExtendedHoursAnalyzer()
+            print("✅ FreeExtendedHoursAnalyzer initialized")
+            results = free_analyzer.run_analysis()
+            print(f"✅ Free API analysis complete, got {len(results)} results")
             
-            # If we got good results from Robinhood, use them
+            # If we got good results from free APIs, use them
             if results and len(results) >= 5:  # At least 5 stocks
-                print("🎯 Using Robinhood 24/7 data")
+                print("🎯 Using free extended hours data")
             else:
-                raise Exception("Insufficient Robinhood data")
+                raise Exception("Insufficient free API data")
                 
         except Exception as e:
-            print(f"⚠️ Robinhood failed ({e}), falling back to Yahoo Finance...")
+            print(f"⚠️ Free APIs failed ({e}), falling back to Yahoo Finance...")
             analyzer = HybridStockAnalyzer()
             results = analyzer.run_analysis()
             print(f"✅ Yahoo Finance fallback complete, got {len(results)} results")
@@ -682,26 +686,26 @@ def api_test_hybrid():
             'traceback': traceback.format_exc()
         }), 500
 
-@app.route('/api/test-robinhood')
-def api_test_robinhood():
-    """Test the Robinhood analyzer directly."""
+@app.route('/api/test-free-apis')
+def api_test_free_apis():
+    """Test the free extended hours APIs directly."""
     try:
-        from robinhood_data_fetcher import RobinhoodStockAnalyzer, RobinhoodDataFetcher
+        from free_extended_hours_fetcher import FreeExtendedHoursAnalyzer, FreeExtendedHoursDataFetcher
         
-        # Test Robinhood data fetcher
-        fetcher = RobinhoodDataFetcher()
-        quote_result = fetcher.get_quote_data('TSLA')
+        # Test free data fetcher
+        fetcher = FreeExtendedHoursDataFetcher()
+        quote_result = fetcher.get_best_quote('TSLA')
         
-        # Test Robinhood analyzer
-        analyzer = RobinhoodStockAnalyzer()
+        # Test free analyzer
+        analyzer = FreeExtendedHoursAnalyzer()
         if quote_result:
-            analysis_result = analyzer.analyze_stock_from_robinhood(quote_result)
+            analysis_result = analyzer.analyze_stock_from_quote(quote_result)
         else:
             analysis_result = None
         
         return jsonify({
             'success': True,
-            'message': 'Robinhood 24/7 analyzer test',
+            'message': 'Free extended hours APIs test',
             'quote_result': quote_result,
             'analysis_result': analysis_result,
             'timestamp': datetime.now().isoformat()
