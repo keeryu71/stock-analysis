@@ -20,6 +20,7 @@ sys.path.append(current_dir)
 from stock_config import get_stock_list
 from free_extended_hours_fetcher import FreeExtendedHoursAnalyzer
 from hybrid_stock_analyzer import HybridStockAnalyzer, HybridOptionsAnalyzer
+from chart_generator import generate_stock_chart
 
 app = Flask(__name__)
 
@@ -394,8 +395,10 @@ MOBILE_TEMPLATE = """
                             <div class="stock-header">
                                 <span class="stock-symbol">
                                     ${dataIcon} ${stock.symbol}${marketStatus}
-                                    <a href="${stock.chart_url || `https://finance.yahoo.com/chart/${stock.symbol}`}"
-                                       target="_blank" style="margin-left: 8px; text-decoration: none;">📊</a>
+                                    <a href="/chart/${stock.symbol}"
+                                       style="margin-left: 8px; text-decoration: none;
+                                              background: #4CAF50; color: white; padding: 4px 8px;
+                                              border-radius: 4px; font-size: 12px;">📊 Chart</a>
                                 </span>
                                 <span class="stock-price">$${stock.price.toFixed(2)}</span>
                             </div>
@@ -409,7 +412,16 @@ MOBILE_TEMPLATE = """
                                 
                                 ${fibDisplay ? `<strong>🌀 Fibonacci Levels:</strong><br>${fibDisplay}<br>` : ''}
                                 
-                                ${entryDisplay ? `<strong>🎯 Optimal Entry Points:</strong><br>${entryDisplay}` : ''}
+                                ${entryDisplay ? `<strong>🎯 Optimal Entry Points:</strong><br>${entryDisplay}<br>` : ''}
+                                
+                                <div style="margin-top: 8px; text-align: center;">
+                                    <a href="/chart/${stock.symbol}"
+                                       style="display: inline-block; background: linear-gradient(45deg, #2196F3, #21CBF3);
+                                              color: white; padding: 8px 16px; border-radius: 8px;
+                                              text-decoration: none; font-weight: 600; font-size: 14px;">
+                                        📊 View Custom Chart
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     `;
@@ -505,6 +517,198 @@ MOBILE_TEMPLATE = """
                 location.reload();
             }
         }, 300000);
+    </script>
+</body>
+</html>
+"""
+
+# Chart page template
+CHART_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 {{ symbol }} - Technical Analysis Chart</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 10px;
+        }
+        
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(45deg, #2196F3, #21CBF3);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+        }
+        
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .back-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .chart-container {
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .chart-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            text-align: center;
+            padding: 40px;
+            color: #F44336;
+        }
+        
+        .chart-info {
+            padding: 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+            font-size: 14px;
+            color: #666;
+            text-align: center;
+        }
+        
+        @media (max-width: 480px) {
+            .container {
+                margin: 5px;
+                border-radius: 10px;
+            }
+            
+            .header h1 {
+                font-size: 20px;
+            }
+            
+            .back-btn {
+                top: 15px;
+                left: 15px;
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="/" class="back-btn">← Back</a>
+            <h1>📊 {{ symbol }} Chart</h1>
+            <p>Technical Analysis with Fibonacci, RSI, Volume & Entry Points</p>
+        </div>
+        
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>Generating custom chart...</p>
+        </div>
+        
+        <div id="chart-container" class="chart-container" style="display: none;">
+            <img id="chart-image" class="chart-image" alt="{{ symbol }} Technical Analysis Chart">
+        </div>
+        
+        <div id="error" class="error" style="display: none;">
+            <h3>❌ Chart Generation Failed</h3>
+            <p id="error-message">Unable to generate chart. Please try again.</p>
+        </div>
+        
+        <div class="chart-info">
+            <p>📈 Custom chart with Fibonacci levels, RSI, volume analysis, and optimal entry points</p>
+            <p>🔄 Chart updates with latest market data</p>
+        </div>
+    </div>
+
+    <script>
+        function loadChart() {
+            fetch('/api/chart/{{ symbol }}')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    document.getElementById('loading').style.display = 'none';
+                    
+                    if (data.success) {
+                        const chartImage = document.getElementById('chart-image');
+                        chartImage.src = 'data:image/png;base64,' + data.chart_data;
+                        document.getElementById('chart-container').style.display = 'block';
+                    } else {
+                        document.getElementById('error-message').textContent = data.error || 'Unknown error';
+                        document.getElementById('error').style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('error-message').textContent = 'Network error: ' + error.message;
+                    document.getElementById('error').style.display = 'block';
+                });
+        }
+        
+        // Load chart when page loads
+        window.onload = loadChart;
     </script>
 </body>
 </html>
@@ -809,6 +1013,65 @@ def api_test_free_apis():
             'error': str(e),
             'traceback': traceback.format_exc()
         }), 500
+
+@app.route('/api/chart/<symbol>')
+def api_get_chart(symbol):
+    """Generate custom technical analysis chart for a stock."""
+    try:
+        print(f"🎨 Generating custom chart for {symbol}...")
+        
+        # Get analysis data for the stock
+        try:
+            free_analyzer = FreeExtendedHoursAnalyzer()
+            results = free_analyzer.run_analysis()
+            
+            # Find the specific stock's analysis
+            analysis_data = None
+            for result in results:
+                if result.get('symbol') == symbol.upper():
+                    analysis_data = result
+                    break
+                    
+        except Exception as e:
+            print(f"⚠️ Could not get analysis data for {symbol}: {e}")
+            analysis_data = None
+        
+        # Generate the chart
+        chart_base64 = generate_stock_chart(symbol.upper(), analysis_data)
+        
+        if chart_base64:
+            print(f"✅ Chart generated successfully for {symbol}")
+            return jsonify({
+                'success': True,
+                'symbol': symbol.upper(),
+                'chart_data': chart_base64,
+                'timestamp': datetime.now().isoformat()
+            })
+        else:
+            print(f"❌ Failed to generate chart for {symbol}")
+            return jsonify({
+                'success': False,
+                'error': f'Could not generate chart for {symbol}',
+                'symbol': symbol.upper()
+            }), 500
+            
+    except Exception as e:
+        error_msg = f"Chart generation error for {symbol}: {str(e)}"
+        print(f"❌ {error_msg}")
+        import traceback
+        traceback.print_exc()
+        
+        return jsonify({
+            'success': False,
+            'error': error_msg,
+            'symbol': symbol.upper(),
+            'details': traceback.format_exc()
+        }), 500
+
+@app.route('/chart/<symbol>')
+def chart_page(symbol):
+    """Display custom chart page for a stock."""
+    return render_template_string(CHART_TEMPLATE, symbol=symbol.upper())
 
 def open_browser():
     """Open browser after a short delay."""
