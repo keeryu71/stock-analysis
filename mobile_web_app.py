@@ -341,14 +341,14 @@ MOBILE_TEMPLATE = """
                                       stock.score >= 0.6 ? '⚡ GOOD SETUP' : '⏳ WAIT';
                     
                     // Icon based on data source
-                    let dataIcon = '📡';
+                    let dataIcon = '🆓';
                     if (stock.data_source && stock.data_source.startsWith('free_api_')) {
                         dataIcon = '🆓';
                     } else if (stock.data_source === 'real_price') {
                         dataIcon = '📡';
                     }
                     
-                    // Add market status for Robinhood data
+                    // Add market status
                     let marketStatus = '';
                     if (stock.market_status && stock.market_status !== 'unknown') {
                         const statusEmoji = {
@@ -361,18 +361,55 @@ MOBILE_TEMPLATE = """
                         marketStatus = ` ${statusEmoji[stock.market_status] || '⚪'}`;
                     }
                     
+                    // RSI trend emoji
+                    const rsiEmoji = stock.rsi_trend === 'Oversold' ? '🟢' :
+                                    stock.rsi_trend === 'Healthy' ? '🟡' :
+                                    stock.rsi_trend === 'Overbought' ? '🟠' : '🔴';
+                    
+                    // Volume trend emoji
+                    const volumeEmoji = stock.volume_trend === 'Strong' ? '🔥' :
+                                       stock.volume_trend === 'Above Average' ? '📈' :
+                                       stock.volume_trend === 'Average' ? '➡️' : '📉';
+                    
+                    // Build Fibonacci levels display
+                    let fibDisplay = '';
+                    if (stock.fibonacci_levels && Object.keys(stock.fibonacci_levels).length > 0) {
+                        const fibKeys = ['23.6', '38.2', '50.0', '61.8', '78.6'];
+                        fibDisplay = fibKeys.map(key =>
+                            stock.fibonacci_levels[key] ?
+                            `${key}%: $${stock.fibonacci_levels[key].toFixed(2)}` : ''
+                        ).filter(x => x).join(' • ');
+                    }
+                    
+                    // Build entry points display
+                    let entryDisplay = '';
+                    if (stock.top_entries && stock.top_entries.length > 0) {
+                        entryDisplay = stock.top_entries.slice(0, 2).map(entry =>
+                            `${entry.level}: $${entry.price.toFixed(2)} (${entry.timeframe})`
+                        ).join('<br>');
+                    }
+                    
                     html += `
                         <div class="stock-card">
                             <div class="stock-header">
-                                <span class="stock-symbol">${dataIcon} ${stock.symbol}${marketStatus}</span>
+                                <span class="stock-symbol">
+                                    ${dataIcon} ${stock.symbol}${marketStatus}
+                                    <a href="${stock.chart_url || `https://finance.yahoo.com/chart/${stock.symbol}`}"
+                                       target="_blank" style="margin-left: 8px; text-decoration: none;">📊</a>
+                                </span>
                                 <span class="stock-price">$${stock.price.toFixed(2)}</span>
                             </div>
                             <div class="signal ${signalClass}">${signalText} (${(stock.score * 100).toFixed(0)}%)</div>
-                            <div class="stock-details">
-                                RSI: ${stock.rsi.toFixed(0)} •
-                                Volume: ${stock.volume_ratio.toFixed(1)}x •
-                                ${stock.top_entries.length > 0 ?
-                                  `Entry: $${stock.top_entries[0].price.toFixed(2)}` : 'No entry'}
+                            
+                            <div class="stock-details" style="margin-top: 10px;">
+                                <strong>📈 Technical Analysis:</strong><br>
+                                ${rsiEmoji} RSI: ${stock.rsi.toFixed(0)} (${stock.rsi_trend}) •
+                                ${volumeEmoji} Volume: ${stock.volume_ratio.toFixed(1)}x (${stock.volume_trend})<br>
+                                📊 SMA20: $${stock.sma_20.toFixed(2)} • SMA50: $${stock.sma_50.toFixed(2)}<br>
+                                
+                                ${fibDisplay ? `<strong>🌀 Fibonacci Levels:</strong><br>${fibDisplay}<br>` : ''}
+                                
+                                ${entryDisplay ? `<strong>🎯 Optimal Entry Points:</strong><br>${entryDisplay}` : ''}
                             </div>
                         </div>
                     `;
@@ -386,6 +423,29 @@ MOBILE_TEMPLATE = """
         
         function displayOptionsResults(data) {
             let html = '<h3 style="margin-bottom: 15px;">💰 Options Analysis Results</h3>';
+            
+            // Check if market is closed
+            if (data.message && data.market_status) {
+                const statusEmoji = {
+                    'weekend': '🔴',
+                    'closed': '🔴',
+                    'regular_hours': '🟢',
+                    'pre_market': '🟡',
+                    'after_hours': '🟠'
+                };
+                
+                html += `<div class="stock-card">
+                    <p style="text-align: center; color: #666;">
+                        ${statusEmoji[data.market_status] || '⚪'} ${data.message}
+                    </p>
+                    <p style="text-align: center; font-size: 12px; color: #999; margin-top: 10px;">
+                        Options trading is only available during market hours
+                    </p>
+                </div>`;
+                
+                document.getElementById('results').innerHTML = html;
+                return;
+            }
             
             if (data.results && data.results.length > 0) {
                 // Count real vs mock options data
@@ -483,7 +543,7 @@ def api_stock_analysis():
             results = analyzer.run_analysis()
             print(f"✅ Yahoo Finance fallback complete, got {len(results)} results")
         
-        # Format results for mobile
+        # Format results for mobile with enhanced data
         mobile_results = []
         for result in results:
             mobile_results.append({
@@ -491,8 +551,19 @@ def api_stock_analysis():
                 'price': result.get('price', 0),
                 'score': result.get('score', 0),
                 'rsi': result.get('rsi', 0),
+                'rsi_trend': result.get('rsi_trend', 'Unknown'),
                 'volume_ratio': result.get('volume_ratio', 0),
+                'volume_trend': result.get('volume_trend', 'Unknown'),
+                'sma_20': result.get('sma_20', 0),
+                'sma_50': result.get('sma_50', 0),
+                'fibonacci_levels': result.get('fibonacci_levels', {}),
+                'fibonacci_level': result.get('fibonacci_level', 'unknown'),
+                'fibonacci_score': result.get('fibonacci_score', 0),
+                'macd_line': result.get('macd_line', 0),
+                'macd_signal': result.get('macd_signal', 'neutral'),
+                'macd_score': result.get('macd_score', 0),
                 'top_entries': result.get('top_entries', []),
+                'chart_url': result.get('chart_url', f"https://finance.yahoo.com/chart/{result.get('symbol', 'TSLA')}"),
                 'data_source': result.get('data_source', 'unknown'),
                 'market_status': result.get('market_status', 'unknown'),
                 'price_source': result.get('price_source', 'unknown')
@@ -523,12 +594,31 @@ def api_stock_analysis():
 def api_options_analysis():
     """API endpoint for options analysis."""
     try:
-        print("🔍 Starting hybrid options analysis...")
+        print("🔍 Starting options analysis...")
+        
+        # Check if market is open for options trading
+        from free_extended_hours_fetcher import FreeExtendedHoursDataFetcher
+        fetcher = FreeExtendedHoursDataFetcher()
+        market_status = fetcher.get_current_market_status()
+        
+        # Only show options during market hours or extended hours
+        if market_status in ['weekend', 'closed']:
+            print(f"⚠️ Market is {market_status} - options analysis not available")
+            return jsonify({
+                'success': True,
+                'results': [],
+                'message': f'Options analysis not available when market is {market_status}',
+                'market_status': market_status,
+                'timestamp': datetime.now().isoformat(),
+                'count': 0
+            })
+        
+        print(f"✅ Market is {market_status} - proceeding with options analysis")
         analyzer = HybridOptionsAnalyzer()
         print("✅ HybridOptionsAnalyzer initialized")
         
         results = analyzer.run_real_time_analysis()
-        print(f"✅ Hybrid options analysis complete, got {len(results)} results")
+        print(f"✅ Options analysis complete, got {len(results)} results")
         
         # Format results for mobile
         mobile_results = []
@@ -538,7 +628,8 @@ def api_options_analysis():
                 'current_price': result.get('current_price', 0),
                 'quality_score': result.get('quality_score', 0),
                 'put_analysis': result.get('put_analysis', []),
-                'days_to_expiration': result.get('days_to_expiration', 0)
+                'days_to_expiration': result.get('days_to_expiration', 0),
+                'data_source': result.get('data_source', 'unknown')
             })
         
         print(f"✅ Formatted {len(mobile_results)} options results for mobile")
@@ -546,6 +637,7 @@ def api_options_analysis():
         return jsonify({
             'success': True,
             'results': mobile_results,
+            'market_status': market_status,
             'timestamp': datetime.now().isoformat(),
             'count': len(mobile_results)
         })

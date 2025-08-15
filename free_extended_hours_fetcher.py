@@ -278,6 +278,124 @@ class FreeExtendedHoursAnalyzer:
         else:
             return 25
     
+    def calculate_fibonacci_levels(self, current_price, previous_close):
+        """Calculate Fibonacci retracement levels."""
+        try:
+            # Use previous close as recent high and estimate a low
+            # In a real system, we'd use actual high/low data
+            high = max(current_price, previous_close)
+            low = min(current_price, previous_close) * 0.85  # Estimate 15% pullback as low
+            
+            # Calculate Fibonacci levels
+            diff = high - low
+            fib_levels = {
+                '23.6': high - (diff * 0.236),
+                '38.2': high - (diff * 0.382),
+                '50.0': high - (diff * 0.500),
+                '61.8': high - (diff * 0.618),
+                '78.6': high - (diff * 0.786)
+            }
+            
+            return fib_levels
+        except:
+            return {}
+    
+    def analyze_fibonacci_position(self, current_price, fib_levels):
+        """Analyze current price position relative to Fibonacci levels."""
+        if not fib_levels:
+            return 0, "unknown"
+        
+        # Check which Fibonacci level the price is near (within 2%)
+        tolerance = current_price * 0.02
+        
+        for level_name, level_price in fib_levels.items():
+            if abs(current_price - level_price) <= tolerance:
+                # Price is near a Fibonacci level
+                if level_name in ['23.6', '38.2']:
+                    return 0.15, f"fib_{level_name}"  # Strong support/resistance
+                elif level_name == '50.0':
+                    return 0.10, f"fib_{level_name}"  # Moderate level
+                elif level_name in ['61.8', '78.6']:
+                    return 0.20, f"fib_{level_name}"  # Golden ratio - very strong
+        
+        # Check if price is between levels (less significant)
+        if fib_levels['61.8'] <= current_price <= fib_levels['38.2']:
+            return 0.05, "fib_zone"  # In the main retracement zone
+        
+        return 0, "no_fib"
+    
+    def calculate_simple_macd(self, current_price, previous_close):
+        """Calculate simplified MACD approximation."""
+        try:
+            # In a real system, we'd use 12-day and 26-day EMAs
+            # Here we approximate using price change and momentum
+            price_change_percent = ((current_price - previous_close) / previous_close) * 100 if previous_close > 0 else 0
+            
+            # Simulate MACD line (12 EMA - 26 EMA)
+            # Positive price change suggests MACD above zero
+            if price_change_percent > 2:
+                macd_line = 1.5  # Strong bullish momentum
+            elif price_change_percent > 0:
+                macd_line = 0.5  # Mild bullish momentum
+            elif price_change_percent > -2:
+                macd_line = -0.5  # Mild bearish momentum
+            else:
+                macd_line = -1.5  # Strong bearish momentum
+            
+            # Simulate signal line (9-day EMA of MACD)
+            # Assume signal line lags slightly behind MACD
+            signal_line = macd_line * 0.8
+            
+            # MACD histogram (MACD - Signal)
+            histogram = macd_line - signal_line
+            
+            return {
+                'macd_line': macd_line,
+                'signal_line': signal_line,
+                'histogram': histogram,
+                'bullish_crossover': macd_line > signal_line and histogram > 0,
+                'bearish_crossover': macd_line < signal_line and histogram < 0
+            }
+        except:
+            return {
+                'macd_line': 0,
+                'signal_line': 0,
+                'histogram': 0,
+                'bullish_crossover': False,
+                'bearish_crossover': False
+            }
+    
+    def analyze_macd_signals(self, macd_data):
+        """Analyze MACD for trading signals."""
+        score = 0
+        signal = "neutral"
+        
+        # MACD above zero line (bullish)
+        if macd_data['macd_line'] > 0:
+            score += 0.05
+        
+        # MACD above signal line (momentum building)
+        if macd_data['macd_line'] > macd_data['signal_line']:
+            score += 0.10
+        
+        # Bullish crossover (MACD crosses above signal)
+        if macd_data['bullish_crossover']:
+            score += 0.15
+            signal = "bullish_crossover"
+        
+        # Bearish crossover (MACD crosses below signal)
+        elif macd_data['bearish_crossover']:
+            score += 0.0  # No points for bearish signal
+            signal = "bearish_crossover"
+        
+        # Strong histogram (momentum acceleration)
+        if macd_data['histogram'] > 0.5:
+            score += 0.10
+        elif macd_data['histogram'] > 0:
+            score += 0.05
+        
+        return score, signal
+    
     def analyze_stock_from_quote(self, quote_data):
         """Analyze a stock using free API quote data."""
         try:
@@ -292,32 +410,113 @@ class FreeExtendedHoursAnalyzer:
             sma_50 = previous_close * 0.95
             volume_ratio = min(3.0, max(0.5, 1.0 + abs(price_change_percent) / 5))
             
-            # Calculate score
-            score = 0.5
+            # Calculate Fibonacci levels
+            fib_levels = self.calculate_fibonacci_levels(current_price, previous_close)
+            fib_score, fib_level = self.analyze_fibonacci_position(current_price, fib_levels)
             
-            # RSI scoring
-            if 30 <= rsi <= 70:
-                score += 0.2
-            elif rsi < 30:
-                score += 0.3
+            # Calculate MACD
+            macd_data = self.calculate_simple_macd(current_price, previous_close)
+            macd_score, macd_signal = self.analyze_macd_signals(macd_data)
             
-            # Price trend
+            # Custom scoring system with user-preferred weighting (0-100%)
+            score = 0.0  # Start from zero
+            
+            # HIGH IMPORTANCE INDICATORS (70 points total)
+            
+            # 1. Moving Averages/Trend Component (0-25 points max) - HIGH IMPORTANCE
+            trend_score = 0.0
             if current_price > sma_20:
-                score += 0.15
+                trend_score += 0.15  # Above short-term trend
             if sma_20 > sma_50:
-                score += 0.15
+                trend_score += 0.10  # Short-term above long-term trend
+            score += trend_score
             
-            # Momentum
-            if price_change_percent > 0:
-                score += 0.1
-            elif price_change_percent > 2:
-                score += 0.15
+            # 2. Volume Component (0-25 points max) - HIGH IMPORTANCE
+            if volume_ratio > 2.0:
+                score += 0.25  # High volume - strong confirmation
+            elif volume_ratio > 1.5:
+                score += 0.20  # Above average volume
+            elif volume_ratio > 1.0:
+                score += 0.15  # Average volume
+            else:
+                score += 0.05  # Low volume - minimal points
             
-            # Extended hours bonus
-            if quote_data['market_status'] in ['pre_market', 'after_hours']:
-                score += 0.05
+            # 3. RSI Component (0-20 points max) - HIGH IMPORTANCE
+            if rsi < 20:
+                score += 0.10  # Very oversold - potential bounce
+            elif 20 <= rsi < 30:
+                score += 0.16  # Oversold - good entry opportunity
+            elif 30 <= rsi <= 50:
+                score += 0.20  # Healthy range - optimal
+            elif 50 < rsi <= 70:
+                score += 0.14  # Slightly overbought but acceptable
+            elif 70 < rsi <= 80:
+                score += 0.06  # Overbought - caution
+            else:  # rsi > 80
+                score += 0.0   # Very overbought - avoid
             
-            score = max(0, min(1, score))
+            # MEDIUM IMPORTANCE INDICATORS (30 points total)
+            
+            # 4. Fibonacci Component (0-15 points max) - MEDIUM IMPORTANCE
+            # Increased from minor to medium importance
+            score += min(fib_score * 1.5, 0.15)  # Scale up to 15 points max
+            
+            # 5. MACD Component (0-15 points max) - MEDIUM IMPORTANCE
+            score += macd_score
+            
+            # Momentum Component integrated into trend analysis
+            # (Price change momentum affects the moving average relationships)
+            
+            # Natural range 0-100%, no artificial constraints
+            score = max(0.0, min(1.0, score))
+            
+            # Calculate optimal entry points for next 2 weeks
+            entry_levels = []
+            
+            # Primary entry at SMA20
+            entry_levels.append({
+                'price': round(sma_20, 2),
+                'level': 'SMA20',
+                'confidence': 'High',
+                'timeframe': '1-3 days'
+            })
+            
+            # Secondary entry at SMA50 (if different)
+            if abs(sma_50 - sma_20) > current_price * 0.02:  # At least 2% difference
+                entry_levels.append({
+                    'price': round(sma_50, 2),
+                    'level': 'SMA50',
+                    'confidence': 'Medium',
+                    'timeframe': '1-2 weeks'
+                })
+            
+            # Fibonacci entry levels
+            if fib_level != "no_fib" and fib_level != "unknown":
+                if fib_level.startswith('fib_'):
+                    level_name = fib_level.replace('fib_', '')
+                    if level_name in fib_levels:
+                        entry_levels.append({
+                            'price': round(fib_levels[level_name], 2),
+                            'level': f'Fib {level_name}%',
+                            'confidence': 'High' if level_name in ['61.8', '78.6'] else 'Medium',
+                            'timeframe': '3-7 days'
+                        })
+                elif fib_level == "fib_zone":
+                    entry_levels.append({
+                        'price': round(fib_levels['50.0'], 2),
+                        'level': 'Fib 50%',
+                        'confidence': 'Medium',
+                        'timeframe': '1 week'
+                    })
+            
+            # Volume trend analysis
+            volume_trend = 'Strong' if volume_ratio >= 2.0 else 'Above Average' if volume_ratio >= 1.5 else 'Average' if volume_ratio >= 1.0 else 'Weak'
+            
+            # RSI trend analysis
+            rsi_trend = 'Oversold' if rsi < 30 else 'Healthy' if rsi <= 50 else 'Overbought' if rsi <= 70 else 'Very Overbought'
+            
+            # Chart analysis URL
+            chart_url = f"https://finance.yahoo.com/chart/{symbol}"
             
             result = {
                 'symbol': symbol,
@@ -325,12 +524,21 @@ class FreeExtendedHoursAnalyzer:
                 'price_change': quote_data['price_change'],
                 'price_change_percent': price_change_percent,
                 'rsi': round(rsi, 1),
+                'rsi_trend': rsi_trend,
                 'sma_20': round(sma_20, 2),
                 'sma_50': round(sma_50, 2),
                 'volume_ratio': round(volume_ratio, 1),
+                'volume_trend': volume_trend,
+                'fibonacci_levels': {k: round(v, 2) for k, v in fib_levels.items()},
+                'fibonacci_level': fib_level,
+                'fibonacci_score': round(fib_score, 3),
+                'macd_line': round(macd_data['macd_line'], 2),
+                'macd_signal': macd_signal,
+                'macd_score': round(macd_score, 3),
                 'score': round(score, 2),
                 'signal': 'BUY' if score >= 0.8 else 'HOLD' if score >= 0.6 else 'WAIT',
-                'top_entries': [{'price': round(sma_20, 2), 'level': 'SMA20'}],
+                'top_entries': entry_levels,
+                'chart_url': chart_url,
                 'market_status': quote_data['market_status'],
                 'price_source': quote_data['price_source'],
                 'data_source': f"free_api_{quote_data['data_source']}"
