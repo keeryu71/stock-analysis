@@ -26,13 +26,14 @@ from matplotlib.figure import Figure
 import warnings
 warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib')
 
-# Try to import yfinance, fallback to mock data if not available
+# Import the robust yfinance wrapper
 try:
-    import yfinance as yf
-    YFINANCE_AVAILABLE = True
+    from yfinance_wrapper import railway_yf, get_stock_data, get_current_price
+    YFINANCE_AVAILABLE = railway_yf.available
+    print("✅ Railway YFinance wrapper loaded")
 except ImportError:
     YFINANCE_AVAILABLE = False
-    print("⚠️ yfinance not available, using mock data for charts")
+    print("⚠️ Railway YFinance wrapper not available")
 
 class StockChartGenerator:
     """Generate custom technical analysis charts."""
@@ -42,131 +43,38 @@ class StockChartGenerator:
         self.dpi = 100
         
     def fetch_chart_data(self, symbol, period='3mo'):
-        """Fetch REAL data for charting using same logic as stock analyzer."""
+        """Fetch REAL data for charting using Railway-optimized wrapper."""
         if not YFINANCE_AVAILABLE:
-            print(f"❌ yfinance not available - cannot generate real chart for {symbol}")
+            print(f"❌ Railway YFinance wrapper not available - cannot generate real chart for {symbol}")
             return None
             
-        # Try multiple periods and methods to get real data (same as hybrid analyzer)
-        periods_to_try = ['3mo', '6mo', '1y', '2y', '5y']
+        # Use the Railway-optimized wrapper
+        print(f"🔍 Chart: Fetching data for {symbol} using Railway wrapper...")
+        
+        # Try different periods with the wrapper
+        periods_to_try = ['1y', '6mo', '3mo', '2mo', '1mo']
         
         for period_attempt in periods_to_try:
-            try:
-                print(f"🔍 Chart: Trying {period_attempt} historical data for {symbol}...")
-                ticker = yf.Ticker(symbol)
-                print(f"🔍 Chart: Created ticker for {symbol}")
-                
-                data = ticker.history(period=period_attempt)
-                print(f"🔍 Chart: History call completed for {symbol}, got {len(data) if not data.empty else 0} rows")
-                
-                if not data.empty and len(data) >= 30:  # Need at least 30 days for indicators
-                    print(f"✅ Chart: Got {len(data)} days of REAL historical data for {symbol} ({period_attempt})")
-                    print(f"✅ Chart: Date range: {data.index[0]} to {data.index[-1]}")
-                    print(f"✅ Chart: Latest close: ${data['Close'].iloc[-1]:.2f}")
-                    # Calculate technical indicators
-                    data = self.calculate_indicators(data)
-                    return data
-                else:
-                    print(f"⚠️ Chart: Insufficient historical data for {symbol} with {period_attempt}: {len(data) if not data.empty else 0} days")
-                    if not data.empty:
-                        print(f"⚠️ Chart: Data columns: {list(data.columns)}")
-                    
-            except Exception as e:
-                print(f"⚠️ Chart: Failed to get {period_attempt} data for {symbol}: {e}")
-                continue
-        
-        # Try alternative download method (same as hybrid analyzer)
-        try:
-            print(f"🔄 Chart: Trying alternative download method for {symbol}...")
-            # Disable caching to avoid SQLite issues on Railway
-            data = yf.download(symbol, period='1y', interval='1d', progress=False,
-                             auto_adjust=True, prepost=True, threads=True, proxy=None)
-            
-            if not data.empty and len(data) >= 30:
-                print(f"✅ Chart: Alternative method got {len(data)} days of REAL data for {symbol}")
-                # Rename columns to match expected format if needed
-                if 'Adj Close' in data.columns:
-                    data['Close'] = data['Adj Close']
+            data = get_stock_data(symbol, period=period_attempt, min_days=20)
+            if data is not None and len(data) >= 20:
+                print(f"✅ Chart: Got {len(data)} days of REAL data for {symbol} ({period_attempt})")
+                print(f"✅ Chart: Date range: {data.index[0]} to {data.index[-1]}")
+                print(f"✅ Chart: Latest close: ${data['Close'].iloc[-1]:.2f}")
                 # Calculate technical indicators
                 data = self.calculate_indicators(data)
                 return data
-                
-        except Exception as e:
-            print(f"⚠️ Chart: Alternative method failed for {symbol}: {e}")
-            
-        # Try with minimal parameters to avoid SQLite issues
-        try:
-            print(f"🔄 Chart: Trying minimal download for {symbol}...")
-            data = yf.download(symbol, period='6mo', auto_adjust=False, progress=False)
-            if not data.empty and len(data) >= 20:
-                print(f"✅ Chart: Minimal method got {len(data)} days of data for {symbol}")
-                data = self.calculate_indicators(data)
-                return data
-        except Exception as e2:
-            print(f"⚠️ Chart: Minimal method also failed for {symbol}: {e2}")
-            
-        # Try ultra-minimal approach - just symbol and period
-        try:
-            print(f"🔄 Chart: Trying ultra-minimal download for {symbol}...")
-            data = yf.download(symbol, period='3mo')
-            if not data.empty and len(data) >= 15:
-                print(f"✅ Chart: Ultra-minimal method got {len(data)} days of data for {symbol}")
-                data = self.calculate_indicators(data)
-                return data
-        except Exception as e3:
-            print(f"⚠️ Chart: Ultra-minimal method also failed for {symbol}: {e3}")
-            
-        # Try using Ticker with different periods as last resort
-        try:
-            print(f"🔄 Chart: Trying ticker with shorter periods for {symbol}...")
-            ticker = yf.Ticker(symbol)
-            for short_period in ['1mo', '2mo', '3mo']:
-                try:
-                    data = ticker.history(period=short_period, auto_adjust=False)
-                    if not data.empty and len(data) >= 10:
-                        print(f"✅ Chart: Short period {short_period} got {len(data)} days for {symbol}")
-                        data = self.calculate_indicators(data)
-                        return data
-                except:
-                    continue
-        except Exception as e4:
-            print(f"⚠️ Chart: Short period method failed for {symbol}: {e4}")
+            else:
+                print(f"⚠️ Chart: Insufficient data for {symbol} with {period_attempt}")
         
         print(f"❌ Chart: Could not get ANY real historical data for {symbol}")
         return None
     
     def get_current_real_price(self, symbol):
-        """Get current real price for anchoring mock data."""
-        try:
-            if not YFINANCE_AVAILABLE:
-                return None
-                
-            ticker = yf.Ticker(symbol)
-            
-            # Try multiple methods to get current price
-            methods = [
-                lambda: ticker.history(period='1d')['Close'].iloc[-1],
-                lambda: ticker.history(period='2d')['Close'].iloc[-1],
-                lambda: ticker.info.get('currentPrice'),
-                lambda: ticker.info.get('regularMarketPrice'),
-                lambda: ticker.info.get('previousClose')
-            ]
-            
-            for method in methods:
-                try:
-                    price = method()
-                    if price and price > 0:
-                        print(f"✅ Got real current price for {symbol}: ${price:.2f}")
-                        return float(price)
-                except:
-                    continue
-                    
-            print(f"⚠️ Could not get real current price for {symbol}")
+        """Get current real price using Railway-optimized wrapper."""
+        if not YFINANCE_AVAILABLE:
             return None
             
-        except Exception as e:
-            print(f"❌ Error getting current price for {symbol}: {e}")
-            return None
+        return get_current_price(symbol)
     
     def generate_mock_data(self, symbol):
         """Generate mock stock data for demonstration."""

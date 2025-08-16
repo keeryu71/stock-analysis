@@ -5,12 +5,21 @@ Hybrid Stock Analyzer for Cloud Deployment
 Fetches real closing prices but uses reliable calculations for indicators
 """
 
-import yfinance as yf
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from stock_config import get_stock_list
 from mock_stock_analyzer import MockStockAnalyzer, MockOptionsAnalyzer
+
+# Import the robust yfinance wrapper
+try:
+    from yfinance_wrapper import railway_yf, get_stock_data, get_current_price
+    import yfinance as yf  # Keep for options analysis
+    YFINANCE_AVAILABLE = railway_yf.available
+    print("✅ Railway YFinance wrapper loaded in hybrid analyzer")
+except ImportError:
+    YFINANCE_AVAILABLE = False
+    print("⚠️ Railway YFinance wrapper not available in hybrid analyzer")
 
 class HybridStockAnalyzer:
     """Hybrid analyzer that fetches real prices with reliable indicators."""
@@ -20,55 +29,13 @@ class HybridStockAnalyzer:
         self.mock_analyzer = MockStockAnalyzer()
     
     def get_real_closing_price(self, symbol, max_retries=3):
-        """Get real closing price with multiple fallback methods."""
-        for attempt in range(max_retries):
-            try:
-                print(f"🔍 Attempt {attempt + 1}: Fetching real price for {symbol}...")
-                
-                # Method 1: Try regular history
-                ticker = yf.Ticker(symbol)
-                
-                # Try different periods to get the most recent data
-                periods = ['1d', '2d', '5d']
-                for period in periods:
-                    try:
-                        hist = ticker.history(period=period)
-                        if not hist.empty:
-                            price = hist['Close'].iloc[-1]
-                            if price > 0:
-                                print(f"✅ Got real price for {symbol}: ${price:.2f}")
-                                return float(price)
-                    except:
-                        continue
-                
-                # Method 2: Try info endpoint
-                try:
-                    info = ticker.info
-                    price_fields = ['currentPrice', 'regularMarketPrice', 'previousClose']
-                    for field in price_fields:
-                        if field in info and info[field] and info[field] > 0:
-                            price = float(info[field])
-                            print(f"✅ Got real price for {symbol} from {field}: ${price:.2f}")
-                            return price
-                except:
-                    pass
-                
-                # Method 3: Try fast_info (newer yfinance feature)
-                try:
-                    fast_info = ticker.fast_info
-                    if hasattr(fast_info, 'last_price') and fast_info.last_price > 0:
-                        price = float(fast_info.last_price)
-                        print(f"✅ Got real price for {symbol} from fast_info: ${price:.2f}")
-                        return price
-                except:
-                    pass
-                    
-            except Exception as e:
-                print(f"⚠️ Attempt {attempt + 1} failed for {symbol}: {e}")
-                continue
-        
-        print(f"❌ Could not fetch real price for {symbol}")
-        return None
+        """Get real closing price using Railway-optimized wrapper."""
+        if not YFINANCE_AVAILABLE:
+            print(f"❌ Railway YFinance wrapper not available for {symbol}")
+            return None
+            
+        print(f"🔍 Fetching real price for {symbol} using Railway wrapper...")
+        return get_current_price(symbol)
     
     def calculate_rsi(self, prices, window=14):
         """Calculate RSI from price series."""
@@ -86,89 +53,26 @@ class HybridStockAnalyzer:
             return 50
     
     def get_historical_data_for_indicators(self, symbol, current_price):
-        """Get REAL historical data for indicators - no synthetic data."""
-        # Try multiple periods and methods to get real historical data
-        periods_to_try = ['3mo', '6mo', '1y', '2y', '5y']
+        """Get REAL historical data for indicators using Railway-optimized wrapper."""
+        if not YFINANCE_AVAILABLE:
+            print(f"❌ Railway YFinance wrapper not available for {symbol}")
+            return None
+            
+        print(f"🔍 Fetching historical data for {symbol} using Railway wrapper...")
+        
+        # Try different periods with the wrapper
+        periods_to_try = ['1y', '6mo', '3mo', '2mo', '1mo']
         
         for period in periods_to_try:
-            try:
-                print(f"🔍 Trying {period} historical data for {symbol}...")
-                ticker = yf.Ticker(symbol)
-                hist = ticker.history(period=period)
-                
-                if not hist.empty and len(hist) >= 30:  # Need at least 30 days for indicators
-                    print(f"✅ Got {len(hist)} days of REAL historical data for {symbol} ({period})")
-                    # Ensure current price is the latest (if we have it)
-                    if current_price:
-                        hist.loc[hist.index[-1], 'Close'] = current_price
-                    return hist
-                else:
-                    print(f"⚠️ Insufficient historical data for {symbol} with {period}: {len(hist) if not hist.empty else 0} days")
-                    
-            except Exception as e:
-                print(f"⚠️ Failed to get {period} data for {symbol}: {e}")
-                continue
-        
-        # Try alternative download method
-        try:
-            print(f"🔄 Trying alternative download method for {symbol}...")
-            # Disable caching to avoid SQLite issues on Railway
-            hist = yf.download(symbol, period='1y', interval='1d', progress=False,
-                             auto_adjust=True, prepost=True, threads=True, proxy=None)
-            
-            if not hist.empty and len(hist) >= 30:
-                print(f"✅ Alternative method got {len(hist)} days of REAL data for {symbol}")
-                # Rename columns to match expected format if needed
-                if 'Adj Close' in hist.columns:
-                    hist['Close'] = hist['Adj Close']
-                # Ensure current price is the latest
+            hist = get_stock_data(symbol, period=period, min_days=20)
+            if hist is not None and len(hist) >= 20:
+                print(f"✅ Got {len(hist)} days of REAL historical data for {symbol} ({period})")
+                # Ensure current price is the latest (if we have it)
                 if current_price:
                     hist.loc[hist.index[-1], 'Close'] = current_price
                 return hist
-                
-        except Exception as e:
-            print(f"⚠️ Alternative method failed for {symbol}: {e}")
-            
-        # Try with minimal parameters to avoid SQLite issues
-        try:
-            print(f"🔄 Trying minimal download for {symbol}...")
-            hist = yf.download(symbol, period='6mo', auto_adjust=False, progress=False)
-            if not hist.empty and len(hist) >= 20:
-                print(f"✅ Minimal method got {len(hist)} days of data for {symbol}")
-                if current_price:
-                    hist.loc[hist.index[-1], 'Close'] = current_price
-                return hist
-        except Exception as e2:
-            print(f"⚠️ Minimal method also failed for {symbol}: {e2}")
-            
-        # Try ultra-minimal approach - just symbol and period
-        try:
-            print(f"🔄 Trying ultra-minimal download for {symbol}...")
-            hist = yf.download(symbol, period='3mo')
-            if not hist.empty and len(hist) >= 15:
-                print(f"✅ Ultra-minimal method got {len(hist)} days of data for {symbol}")
-                if current_price:
-                    hist.loc[hist.index[-1], 'Close'] = current_price
-                return hist
-        except Exception as e3:
-            print(f"⚠️ Ultra-minimal method also failed for {symbol}: {e3}")
-            
-        # Try using Ticker with different periods as last resort
-        try:
-            print(f"🔄 Trying ticker with shorter periods for {symbol}...")
-            ticker = yf.Ticker(symbol)
-            for short_period in ['1mo', '2mo', '3mo']:
-                try:
-                    hist = ticker.history(period=short_period, auto_adjust=False)
-                    if not hist.empty and len(hist) >= 10:
-                        print(f"✅ Short period {short_period} got {len(hist)} days for {symbol}")
-                        if current_price:
-                            hist.loc[hist.index[-1], 'Close'] = current_price
-                        return hist
-                except:
-                    continue
-        except Exception as e4:
-            print(f"⚠️ Short period method failed for {symbol}: {e4}")
+            else:
+                print(f"⚠️ Insufficient data for {symbol} with {period}")
         
         print(f"❌ Could not get ANY real historical data for {symbol}")
         return None
