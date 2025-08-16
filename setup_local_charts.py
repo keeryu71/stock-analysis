@@ -190,8 +190,8 @@ def main():
         return False
     
     try:
-        # Step 4: Generate sample charts
-        generate_sample_charts()
+        # Step 4: Generate charts for top setups
+        generate_top_charts()
         
         # Step 5: Test chart access
         if test_chart_access():
@@ -202,7 +202,8 @@ def main():
             print("3. Click on any stock's '📊 Chart' button")
             print("4. Charts will now display real market data!")
             print("\n💡 Tips:")
-            print("- Charts update automatically every hour")
+            print("- Charts update automatically every hour with top setups")
+            print("- Generate top charts: POST http://localhost:5001/generate/top")
             print("- Generate all charts: POST http://localhost:5001/generate/all")
             print("- Check server status: http://localhost:5001/health")
             print("\n⏹️ To stop: Press Ctrl+C")
