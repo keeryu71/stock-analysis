@@ -104,17 +104,26 @@ class MockOptionsAnalyzer:
     """Mock options analyzer that provides realistic sample data."""
     
     def __init__(self):
-        self.stocks = get_stock_list()[:5]  # Limit to first 5 stocks
+        self.stocks = get_stock_list()  # Use all 50 stocks
         random.seed(42)
     
     def generate_mock_options_data(self, symbol):
         """Generate realistic mock options data."""
-        # Base prices for different stocks
+        # More realistic base prices for popular stocks
         base_prices = {
-            'TSLA': 250.0, 'AMD': 140.0, 'BMNR': 15.0, 'SBET': 8.0, 'MSTR': 180.0
+            'AAPL': 230.0, 'MSFT': 520.0, 'GOOGL': 204.0, 'AMZN': 231.0, 'NVDA': 180.0,
+            'META': 101.0, 'TSLA': 331.0, 'NFLX': 1239.0, 'AMD': 178.0, 'CRM': 242.0,
+            'ORCL': 248.0, 'ADBE': 355.0, 'AVGO': 306.0, 'INTC': 25.0, 'QCOM': 158.0,
+            'JPM': 290.0, 'BAC': 47.0, 'WFC': 77.0, 'GS': 731.0, 'MS': 145.0,
+            'C': 94.0, 'V': 344.0, 'MA': 582.0, 'PYPL': 69.0, 'JNJ': 177.0,
+            'PFE': 25.0, 'UNH': 304.0, 'ABBV': 207.0, 'MRK': 84.0, 'TMO': 489.0,
+            'ABT': 132.0, 'WMT': 100.0, 'HD': 133.0, 'PG': 154.0, 'KO': 70.0,
+            'PEP': 150.0, 'NKE': 77.0, 'MCD': 309.0, 'SBUX': 91.0, 'XOM': 106.0,
+            'CVX': 157.0, 'BA': 235.0, 'CAT': 408.0, 'GE': 268.0, 'PLTR': 177.0,
+            'HOOD': 114.0, 'COIN': 318.0, 'SOFI': 24.0, 'RIVN': 12.0, 'LCID': 2.0
         }
         
-        base_price = base_prices.get(symbol, 100.0)
+        base_price = base_prices.get(symbol, 150.0)  # Better default price
         current_price = base_price * (1 + random.uniform(-0.05, 0.05))
         
         # Generate put options at different strikes
