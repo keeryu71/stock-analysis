@@ -42,53 +42,51 @@ class StockChartGenerator:
         self.dpi = 100
         
     def fetch_chart_data(self, symbol, period='3mo'):
-        """Fetch REAL data for charting - no mock fallbacks."""
+        """Fetch REAL data for charting using same logic as stock analyzer."""
         if not YFINANCE_AVAILABLE:
             print(f"❌ yfinance not available - cannot generate real chart for {symbol}")
             return None
             
-        # Try multiple periods and methods to get real data
+        # Try multiple periods and methods to get real data (same as hybrid analyzer)
         periods_to_try = ['3mo', '6mo', '1y', '2y', '5y']
         
         for period_attempt in periods_to_try:
             try:
-                print(f"🔍 Attempting to fetch {period_attempt} data for {symbol}...")
+                print(f"🔍 Chart: Trying {period_attempt} historical data for {symbol}...")
                 ticker = yf.Ticker(symbol)
                 data = ticker.history(period=period_attempt)
                 
-                if not data.empty and len(data) >= 30:  # Need at least 30 days
-                    print(f"✅ Got {len(data)} days of REAL data for {symbol} ({period_attempt})")
+                if not data.empty and len(data) >= 30:  # Need at least 30 days for indicators
+                    print(f"✅ Chart: Got {len(data)} days of REAL historical data for {symbol} ({period_attempt})")
                     # Calculate technical indicators
                     data = self.calculate_indicators(data)
                     return data
                 else:
-                    print(f"⚠️ Insufficient data for {symbol} with {period_attempt}: {len(data) if not data.empty else 0} days")
+                    print(f"⚠️ Chart: Insufficient historical data for {symbol} with {period_attempt}: {len(data) if not data.empty else 0} days")
                     
             except Exception as e:
-                print(f"⚠️ Failed to fetch {period_attempt} data for {symbol}: {e}")
+                print(f"⚠️ Chart: Failed to get {period_attempt} data for {symbol}: {e}")
                 continue
         
-        # If all periods failed, try different approaches
+        # Try alternative download method (same as hybrid analyzer)
         try:
-            print(f"🔄 Trying alternative data fetch for {symbol}...")
-            ticker = yf.Ticker(symbol)
-            
-            # Try downloading with different parameters
+            print(f"🔄 Chart: Trying alternative download method for {symbol}...")
             import yfinance as yf
             data = yf.download(symbol, period='1y', interval='1d', progress=False)
             
             if not data.empty and len(data) >= 30:
-                print(f"✅ Alternative method got {len(data)} days of REAL data for {symbol}")
-                # Rename columns to match expected format
+                print(f"✅ Chart: Alternative method got {len(data)} days of REAL data for {symbol}")
+                # Rename columns to match expected format if needed
                 if 'Adj Close' in data.columns:
                     data['Close'] = data['Adj Close']
+                # Calculate technical indicators
                 data = self.calculate_indicators(data)
                 return data
                 
         except Exception as e:
-            print(f"⚠️ Alternative method failed for {symbol}: {e}")
+            print(f"⚠️ Chart: Alternative method failed for {symbol}: {e}")
         
-        print(f"❌ Could not fetch ANY real data for {symbol} - refusing to use mock data")
+        print(f"❌ Chart: Could not get ANY real historical data for {symbol}")
         return None
     
     def get_current_real_price(self, symbol):
