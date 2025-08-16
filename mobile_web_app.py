@@ -225,7 +225,7 @@ MOBILE_TEMPLATE = """
                 🏆 Find Top 10 Best Setups
             </button>
             <button class="btn btn-secondary" onclick="runOptionsAnalysis()">
-                💰 Options Analysis
+                💰 Top 10 Best Options Setups
             </button>
         </div>
         
@@ -452,7 +452,7 @@ MOBILE_TEMPLATE = """
         }
         
         function displayOptionsResults(data) {
-            let html = '<h3 style="margin-bottom: 15px;">💰 Options Analysis Results</h3>';
+            let html = '<h3 style="margin-bottom: 15px;">💰 Top 10 Best Options Setups</h3>';
             
             // Check if market is closed
             if (data.message && data.market_status) {
@@ -478,52 +478,102 @@ MOBILE_TEMPLATE = """
             }
             
             if (data.results && data.results.length > 0) {
-                // Count real vs mock options data
+                // Count data sources
                 let realCount = 0;
+                let calculatedCount = 0;
                 let mockCount = 0;
+                
                 data.results.forEach(stock => {
-                    if (stock.data_source === 'real_options') realCount++;
-                    else mockCount++;
+                    if (stock.data_source === 'recent_options_data') {
+                        realCount++;
+                    } else if (stock.data_source === 'calculated_options') {
+                        calculatedCount++;
+                    } else {
+                        mockCount++;
+                    }
                 });
                 
-                // Add data source info
-                if (realCount > 0 && mockCount > 0) {
-                    html += `<p style="font-size: 12px; color: #666; margin-bottom: 10px;">
-                        📡 ${realCount} real options, ${mockCount} demo data</p>`;
-                } else if (realCount > 0) {
-                    html += `<p style="font-size: 12px; color: #4CAF50; margin-bottom: 10px;">
-                        📡 All options are real-time</p>`;
-                } else {
-                    html += `<p style="font-size: 12px; color: #FF9800; margin-bottom: 10px;">
-                        📡 Demo options data (market closed)</p>`;
+                // Add analysis info
+                let statusText = `🔍 Analyzed top 50 popular stocks, showing ${data.results.length} best options setups`;
+                if (realCount > 0) {
+                    statusText += ` • 📡 ${realCount} real options`;
+                    if (calculatedCount > 0) statusText += `, ${calculatedCount} calculated`;
+                    if (mockCount > 0) statusText += `, ${mockCount} demo`;
+                } else if (calculatedCount > 0) {
+                    statusText += ` • 🎯 ${calculatedCount} calculated options`;
+                    if (mockCount > 0) statusText += `, ${mockCount} demo`;
+                } else if (mockCount > 0) {
+                    statusText += ` • 🎯 ${mockCount} demo options`;
                 }
                 
-                data.results.forEach(stock => {
+                html += `<p style="font-size: 12px; color: #4CAF50; margin-bottom: 10px;">${statusText}</p>`;
+                
+                data.results.forEach((stock, index) => {
                     if (stock.put_analysis && stock.put_analysis.length > 0) {
                         const bestPut = stock.put_analysis[0];
                         const qualityStars = '⭐'.repeat(Math.ceil(stock.quality_score * 5));
+                        const rankingScore = stock.ranking_score ? (stock.ranking_score * 100).toFixed(0) : 'N/A';
                         
-                        const dataIcon = stock.data_source === 'real_options' ? '📡' : '🎯';
+                        // Data source icon
+                        let dataIcon = '🎯';
+                        if (stock.data_source === 'recent_options_data') {
+                            dataIcon = '📡';
+                        } else if (stock.data_source === 'calculated_options') {
+                            dataIcon = '🎯';
+                        }
+                        
+                        // Quality indicator based on ranking score
+                        let qualityIndicator = '';
+                        if (stock.ranking_score >= 0.8) {
+                            qualityIndicator = '🟢'; // Excellent
+                        } else if (stock.ranking_score >= 0.6) {
+                            qualityIndicator = '🟡'; // Good
+                        } else if (stock.ranking_score >= 0.4) {
+                            qualityIndicator = '🟠'; // Fair
+                        } else {
+                            qualityIndicator = '🔴'; // Poor
+                        }
+                        
+                        // Calculate potential profit
+                        const premium = bestPut.last_price || bestPut.bid;
+                        const annualReturn = (bestPut.annualized_return * 100).toFixed(1);
+                        const daysReturn = ((bestPut.annualized_return * bestPut.days_to_exp / 365) * 100).toFixed(1);
                         
                         html += `
                             <div class="stock-card">
                                 <div class="stock-header">
-                                    <span class="stock-symbol">${dataIcon} ${stock.symbol}</span>
+                                    <span class="stock-symbol">
+                                        ${dataIcon} #${index + 1} ${stock.symbol}${qualityIndicator}
+                                    </span>
                                     <span class="stock-price">$${stock.current_price.toFixed(2)}</span>
                                 </div>
-                                <div class="stock-details">
-                                    <strong>Best Put: $${bestPut.strike.toFixed(2)}</strong><br>
-                                    Premium: $${bestPut.bid.toFixed(2)} •
-                                    Return: ${(bestPut.annualized_return * 100).toFixed(1)}%<br>
-                                    Quality: ${qualityStars} •
-                                    Days: ${bestPut.days_to_exp}d
+                                <div class="signal signal-buy">🚀 QUALITY SCORE: ${rankingScore}%</div>
+                                
+                                <div class="stock-details" style="margin-top: 10px;">
+                                    <strong>💰 Best Put Option:</strong><br>
+                                    Strike: $${bestPut.strike.toFixed(2)} • Premium: $${premium.toFixed(2)}<br>
+                                    📈 Returns: ${daysReturn}% (${bestPut.days_to_exp}d) • ${annualReturn}% annual<br>
+                                    📊 Volume: ${bestPut.volume || 'N/A'} • Quality: ${qualityStars}<br>
+                                    
+                                    <strong>🎯 Strategy:</strong><br>
+                                    Cash-secured put at $${bestPut.strike.toFixed(2)} strike<br>
+                                    Collect $${premium.toFixed(2)} premium per contract<br>
+                                    
+                                    <div style="margin-top: 8px; text-align: center;">
+                                        <a href="/chart/${stock.symbol}"
+                                           style="display: inline-block; background: linear-gradient(45deg, #FF9800, #F57C00);
+                                                  color: white; padding: 8px 16px; border-radius: 8px;
+                                                  text-decoration: none; font-weight: 600; font-size: 14px;">
+                                            📊 View Options Chart
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         `;
                     }
                 });
             } else {
-                html += '<div class="stock-card"><p>No options data available</p></div>';
+                html += '<div class="stock-card"><p>No good options setups found in top 50 stocks. Market conditions may not be favorable for options trading right now.</p></div>';
             }
             
             document.getElementById('results').innerHTML = html;
@@ -842,13 +892,14 @@ def api_options_analysis():
         results = analyzer.run_real_time_analysis()
         print(f"✅ Options analysis complete, got {len(results)} results")
         
-        # Format results for mobile
+        # Format results for mobile with enhanced data
         mobile_results = []
         for result in results:
             mobile_results.append({
                 'symbol': result.get('symbol', 'N/A'),
                 'current_price': result.get('current_price', 0),
                 'quality_score': result.get('quality_score', 0),
+                'ranking_score': result.get('ranking_score', 0),
                 'put_analysis': result.get('put_analysis', []),
                 'days_to_expiration': result.get('days_to_expiration', 0),
                 'data_source': result.get('data_source', 'unknown')
