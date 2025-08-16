@@ -128,17 +128,47 @@ class HybridStockAnalyzer:
                 
         except Exception as e:
             print(f"⚠️ Alternative method failed for {symbol}: {e}")
-            # Try with minimal parameters to avoid SQLite issues
-            try:
-                print(f"🔄 Trying minimal download for {symbol}...")
-                hist = yf.download(symbol, period='6mo', auto_adjust=False, progress=False)
-                if not hist.empty and len(hist) >= 20:
-                    print(f"✅ Minimal method got {len(hist)} days of data for {symbol}")
-                    if current_price:
-                        hist.loc[hist.index[-1], 'Close'] = current_price
-                    return hist
-            except Exception as e2:
-                print(f"⚠️ Minimal method also failed for {symbol}: {e2}")
+            
+        # Try with minimal parameters to avoid SQLite issues
+        try:
+            print(f"🔄 Trying minimal download for {symbol}...")
+            hist = yf.download(symbol, period='6mo', auto_adjust=False, progress=False)
+            if not hist.empty and len(hist) >= 20:
+                print(f"✅ Minimal method got {len(hist)} days of data for {symbol}")
+                if current_price:
+                    hist.loc[hist.index[-1], 'Close'] = current_price
+                return hist
+        except Exception as e2:
+            print(f"⚠️ Minimal method also failed for {symbol}: {e2}")
+            
+        # Try ultra-minimal approach - just symbol and period
+        try:
+            print(f"🔄 Trying ultra-minimal download for {symbol}...")
+            hist = yf.download(symbol, period='3mo')
+            if not hist.empty and len(hist) >= 15:
+                print(f"✅ Ultra-minimal method got {len(hist)} days of data for {symbol}")
+                if current_price:
+                    hist.loc[hist.index[-1], 'Close'] = current_price
+                return hist
+        except Exception as e3:
+            print(f"⚠️ Ultra-minimal method also failed for {symbol}: {e3}")
+            
+        # Try using Ticker with different periods as last resort
+        try:
+            print(f"🔄 Trying ticker with shorter periods for {symbol}...")
+            ticker = yf.Ticker(symbol)
+            for short_period in ['1mo', '2mo', '3mo']:
+                try:
+                    hist = ticker.history(period=short_period, auto_adjust=False)
+                    if not hist.empty and len(hist) >= 10:
+                        print(f"✅ Short period {short_period} got {len(hist)} days for {symbol}")
+                        if current_price:
+                            hist.loc[hist.index[-1], 'Close'] = current_price
+                        return hist
+                except:
+                    continue
+        except Exception as e4:
+            print(f"⚠️ Short period method failed for {symbol}: {e4}")
         
         print(f"❌ Could not get ANY real historical data for {symbol}")
         return None

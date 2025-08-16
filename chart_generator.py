@@ -93,16 +93,44 @@ class StockChartGenerator:
                 
         except Exception as e:
             print(f"⚠️ Chart: Alternative method failed for {symbol}: {e}")
-            # Try with minimal parameters to avoid SQLite issues
-            try:
-                print(f"🔄 Chart: Trying minimal download for {symbol}...")
-                data = yf.download(symbol, period='6mo', auto_adjust=False, progress=False)
-                if not data.empty and len(data) >= 20:
-                    print(f"✅ Chart: Minimal method got {len(data)} days of data for {symbol}")
-                    data = self.calculate_indicators(data)
-                    return data
-            except Exception as e2:
-                print(f"⚠️ Chart: Minimal method also failed for {symbol}: {e2}")
+            
+        # Try with minimal parameters to avoid SQLite issues
+        try:
+            print(f"🔄 Chart: Trying minimal download for {symbol}...")
+            data = yf.download(symbol, period='6mo', auto_adjust=False, progress=False)
+            if not data.empty and len(data) >= 20:
+                print(f"✅ Chart: Minimal method got {len(data)} days of data for {symbol}")
+                data = self.calculate_indicators(data)
+                return data
+        except Exception as e2:
+            print(f"⚠️ Chart: Minimal method also failed for {symbol}: {e2}")
+            
+        # Try ultra-minimal approach - just symbol and period
+        try:
+            print(f"🔄 Chart: Trying ultra-minimal download for {symbol}...")
+            data = yf.download(symbol, period='3mo')
+            if not data.empty and len(data) >= 15:
+                print(f"✅ Chart: Ultra-minimal method got {len(data)} days of data for {symbol}")
+                data = self.calculate_indicators(data)
+                return data
+        except Exception as e3:
+            print(f"⚠️ Chart: Ultra-minimal method also failed for {symbol}: {e3}")
+            
+        # Try using Ticker with different periods as last resort
+        try:
+            print(f"🔄 Chart: Trying ticker with shorter periods for {symbol}...")
+            ticker = yf.Ticker(symbol)
+            for short_period in ['1mo', '2mo', '3mo']:
+                try:
+                    data = ticker.history(period=short_period, auto_adjust=False)
+                    if not data.empty and len(data) >= 10:
+                        print(f"✅ Chart: Short period {short_period} got {len(data)} days for {symbol}")
+                        data = self.calculate_indicators(data)
+                        return data
+                except:
+                    continue
+        except Exception as e4:
+            print(f"⚠️ Chart: Short period method failed for {symbol}: {e4}")
         
         print(f"❌ Chart: Could not get ANY real historical data for {symbol}")
         return None
@@ -346,7 +374,7 @@ class StockChartGenerator:
         try:
             print(f"🎨 Starting chart generation for {symbol}")
             
-            # Fetch data
+            # Fetch data - REAL DATA ONLY
             data = self.fetch_chart_data(symbol)
             if data is None:
                 print(f"⚠️ No real historical data available for {symbol}, creating simple price chart")
@@ -357,6 +385,9 @@ class StockChartGenerator:
                 return self.create_simple_price_chart(symbol, analysis_data)
             
             print(f"✅ Data fetched for {symbol}: {len(data)} days")
+            
+            # Determine data source for display
+            data_source_text = "Real Market Data" if hasattr(data, '_real_data') else "Simulated Data (Real Price Anchored)"
             
             # Calculate Fibonacci levels
             fib_levels, fib_high_date, fib_low_date = self.calculate_fibonacci_levels(data)
@@ -483,6 +514,10 @@ class StockChartGenerator:
                 summary_text = f"Score: {score:.0f}% | Signal: {signal}"
                 fig.text(0.02, 0.98, summary_text, fontsize=14, weight='bold', color=signal_color,
                         bbox=dict(boxstyle='round,pad=0.5', facecolor=signal_color, alpha=0.2))
+            
+            # Add data source indicator
+            fig.text(0.98, 0.02, data_source_text, fontsize=10, ha='right', va='bottom',
+                    color='#666', style='italic', transform=fig.transFigure)
             
             # Adjust layout
             plt.tight_layout()
