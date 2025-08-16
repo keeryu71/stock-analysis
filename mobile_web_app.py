@@ -7,6 +7,7 @@ Simple web interface that works on phones
 
 import os
 import sys
+import requests
 from flask import Flask, render_template_string, jsonify, request
 from datetime import datetime
 import threading
@@ -1083,7 +1084,7 @@ def api_test_free_apis():
 
 @app.route('/api/chart/<symbol>')
 def api_get_chart(symbol):
-    """Generate custom technical analysis chart for a stock."""
+    """Generate custom technical analysis chart for a stock with local fallback."""
     try:
         print(f"🎨 Generating custom chart for {symbol}...")
         
@@ -1103,24 +1104,56 @@ def api_get_chart(symbol):
             print(f"⚠️ Could not get analysis data for {symbol}: {e}")
             analysis_data = None
         
-        # Generate the chart
-        chart_base64 = generate_stock_chart(symbol.upper(), analysis_data)
+        # Try Railway chart generation first
+        try:
+            print(f"🔄 Trying Railway chart generation for {symbol}...")
+            chart_base64 = generate_stock_chart(symbol.upper(), analysis_data)
+            
+            if chart_base64:
+                print(f"✅ Railway chart generated successfully for {symbol}")
+                return jsonify({
+                    'success': True,
+                    'symbol': symbol.upper(),
+                    'chart_data': chart_base64,
+                    'source': 'railway',
+                    'timestamp': datetime.now().isoformat()
+                })
+        except Exception as e:
+            print(f"⚠️ Railway chart generation failed for {symbol}: {e}")
         
-        if chart_base64:
-            print(f"✅ Chart generated successfully for {symbol}")
-            return jsonify({
-                'success': True,
-                'symbol': symbol.upper(),
-                'chart_data': chart_base64,
-                'timestamp': datetime.now().isoformat()
-            })
-        else:
-            print(f"❌ Failed to generate chart for {symbol}")
-            return jsonify({
-                'success': False,
-                'error': f'Could not generate chart for {symbol}',
-                'symbol': symbol.upper()
-            }), 500
+        # Try local chart server fallback
+        try:
+            print(f"🏠 Trying local chart server for {symbol}...")
+            local_chart_url = f"http://localhost:5001/chart/{symbol.upper()}"
+            
+            response = requests.get(local_chart_url, timeout=10)
+            if response.status_code == 200:
+                local_data = response.json()
+                if local_data.get('success') and local_data.get('chart'):
+                    print(f"✅ Local chart server provided chart for {symbol}")
+                    return jsonify({
+                        'success': True,
+                        'symbol': symbol.upper(),
+                        'chart_data': local_data['chart'],
+                        'source': 'local_server',
+                        'timestamp': datetime.now().isoformat(),
+                        'message': 'Chart generated locally with real market data'
+                    })
+        except Exception as e:
+            print(f"⚠️ Local chart server failed for {symbol}: {e}")
+        
+        # Final fallback - return error with helpful message
+        print(f"❌ All chart generation methods failed for {symbol}")
+        return jsonify({
+            'success': False,
+            'error': f'Chart generation failed for {symbol}. To enable charts: 1) Run local chart server: python local_chart_server.py, 2) Generate charts: POST http://localhost:5001/generate/all',
+            'symbol': symbol.upper(),
+            'help': {
+                'local_server': 'python local_chart_server.py',
+                'generate_charts': 'POST http://localhost:5001/generate/all',
+                'get_chart': f'GET http://localhost:5001/chart/{symbol.upper()}'
+            }
+        }), 500
             
     except Exception as e:
         error_msg = f"Chart generation error for {symbol}: {str(e)}"
