@@ -866,26 +866,14 @@ def api_stock_analysis():
 def api_options_analysis():
     """API endpoint for options analysis."""
     try:
-        print("🔍 Starting options analysis...")
+        print("🔍 Starting 24/7 options analysis using closing prices...")
         
-        # Check if market is open for options trading
+        # Get market status for informational purposes only
         from free_extended_hours_fetcher import FreeExtendedHoursDataFetcher
         fetcher = FreeExtendedHoursDataFetcher()
         market_status = fetcher.get_current_market_status()
         
-        # Only show options during market hours or extended hours
-        if market_status in ['weekend', 'closed']:
-            print(f"⚠️ Market is {market_status} - options analysis not available")
-            return jsonify({
-                'success': True,
-                'results': [],
-                'message': f'Options analysis not available when market is {market_status}',
-                'market_status': market_status,
-                'timestamp': datetime.now().isoformat(),
-                'count': 0
-            })
-        
-        print(f"✅ Market is {market_status} - proceeding with options analysis")
+        print(f"📊 Market status: {market_status} - proceeding with options analysis using most recent closing data")
         analyzer = HybridOptionsAnalyzer()
         print("✅ HybridOptionsAnalyzer initialized")
         
