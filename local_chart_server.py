@@ -230,6 +230,12 @@ def get_all_charts():
         'last_update': chart_service.last_update.isoformat() if chart_service.last_update else None
     })
 
+@app.route('/generate/top', methods=['POST'])
+def generate_top_charts():
+    """Generate charts for top 10 stocks and top 10 options setups."""
+    result = chart_service.generate_top_charts()
+    return jsonify(result)
+
 @app.route('/generate/all', methods=['POST'])
 def generate_all_charts():
     """Generate charts for all symbols."""
@@ -258,8 +264,8 @@ def generate_chart(symbol):
 
 def schedule_updates():
     """Schedule automatic chart updates."""
-    # Update charts every hour during market hours
-    schedule.every().hour.do(chart_service.generate_all_charts)
+    # Update top charts every hour during market hours
+    schedule.every().hour.do(chart_service.generate_top_charts)
     
     while True:
         schedule.run_pending()
@@ -280,11 +286,12 @@ if __name__ == "__main__":
     print("  GET  /health - Health check")
     print("  GET  /chart/<symbol> - Get chart for symbol")
     print("  GET  /charts/bulk - Get all charts")
+    print("  POST /generate/top - Generate charts for top 10 stocks + top 10 options")
     print("  POST /generate/all - Generate all charts")
     print("  POST /generate/<symbol> - Generate chart for symbol")
     print("\n💡 Usage:")
     print("  1. Run this server locally: python local_chart_server.py")
-    print("  2. Generate charts: POST http://localhost:5001/generate/all")
+    print("  2. Generate priority charts: POST http://localhost:5001/generate/top")
     print("  3. Update your web app to fetch from: http://localhost:5001/chart/<symbol>")
     
     # Run the Flask app
