@@ -112,8 +112,9 @@ class HybridStockAnalyzer:
         # Try alternative download method
         try:
             print(f"🔄 Trying alternative download method for {symbol}...")
-            import yfinance as yf
-            hist = yf.download(symbol, period='1y', interval='1d', progress=False)
+            # Disable caching to avoid SQLite issues on Railway
+            hist = yf.download(symbol, period='1y', interval='1d', progress=False,
+                             auto_adjust=True, prepost=True, threads=True, proxy=None)
             
             if not hist.empty and len(hist) >= 30:
                 print(f"✅ Alternative method got {len(hist)} days of REAL data for {symbol}")
@@ -127,6 +128,17 @@ class HybridStockAnalyzer:
                 
         except Exception as e:
             print(f"⚠️ Alternative method failed for {symbol}: {e}")
+            # Try with minimal parameters to avoid SQLite issues
+            try:
+                print(f"🔄 Trying minimal download for {symbol}...")
+                hist = yf.download(symbol, period='6mo', auto_adjust=False, progress=False)
+                if not hist.empty and len(hist) >= 20:
+                    print(f"✅ Minimal method got {len(hist)} days of data for {symbol}")
+                    if current_price:
+                        hist.loc[hist.index[-1], 'Close'] = current_price
+                    return hist
+            except Exception as e2:
+                print(f"⚠️ Minimal method also failed for {symbol}: {e2}")
         
         print(f"❌ Could not get ANY real historical data for {symbol}")
         return None

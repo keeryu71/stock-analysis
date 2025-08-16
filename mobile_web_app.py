@@ -1140,6 +1140,63 @@ def chart_page(symbol):
     """Display custom chart page for a stock."""
     return render_template_string(CHART_TEMPLATE, symbol=symbol.upper())
 
+@app.route('/api/test-crm-data')
+def test_crm_data():
+    """Test CRM data fetching directly and return results."""
+    try:
+        print("🔍 Testing CRM data fetch directly...")
+        import yfinance as yf
+        
+        results = []
+        
+        # Test basic ticker creation
+        try:
+            ticker = yf.Ticker("CRM")
+            results.append("✅ CRM ticker created successfully")
+        except Exception as e:
+            results.append(f"❌ CRM ticker creation failed: {e}")
+            return jsonify({'success': False, 'results': results})
+        
+        # Test different methods
+        methods_to_try = [
+            ("1d history", lambda: ticker.history(period='1d')),
+            ("5d history", lambda: ticker.history(period='5d')),
+            ("1mo history", lambda: ticker.history(period='1mo')),
+            ("3mo history", lambda: ticker.history(period='3mo')),
+            ("6mo history", lambda: ticker.history(period='6mo')),
+            ("1y history", lambda: ticker.history(period='1y')),
+            ("yf.download 1y", lambda: yf.download("CRM", period='1y', progress=False)),
+        ]
+        
+        success_count = 0
+        for method_name, method_func in methods_to_try:
+            try:
+                results.append(f"🔍 Trying {method_name}...")
+                data = method_func()
+                if not data.empty:
+                    results.append(f"✅ {method_name}: Got {len(data)} days of data")
+                    results.append(f"   Date range: {data.index[0]} to {data.index[-1]}")
+                    results.append(f"   Latest close: ${data['Close'].iloc[-1]:.2f}")
+                    success_count += 1
+                else:
+                    results.append(f"⚠️ {method_name}: Empty data")
+            except Exception as e:
+                results.append(f"❌ {method_name}: {e}")
+        
+        return jsonify({
+            'success': True,
+            'results': results,
+            'successful_methods': success_count,
+            'total_methods': len(methods_to_try)
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f"CRM test failed: {e}",
+            'results': results if 'results' in locals() else []
+        })
+
 def open_browser():
     """Open browser after a short delay."""
     time.sleep(1.5)
