@@ -454,6 +454,13 @@ MOBILE_TEMPLATE = """
         function displayOptionsResults(data) {
             let html = '<h3 style="margin-bottom: 15px;">💰 Top 10 Best Options Setups</h3>';
             
+            // Add timestamp to verify fresh data
+            const now = new Date();
+            const timestamp = now.toLocaleTimeString();
+            html += `<p style="font-size: 11px; color: #999; margin-bottom: 10px;">
+                🕐 Analysis completed at ${timestamp}
+            </p>`;
+            
             // Check if market is closed
             if (data.message && data.market_status) {
                 const statusEmoji = {
