@@ -54,15 +54,22 @@ class StockChartGenerator:
             try:
                 print(f"🔍 Chart: Trying {period_attempt} historical data for {symbol}...")
                 ticker = yf.Ticker(symbol)
+                print(f"🔍 Chart: Created ticker for {symbol}")
+                
                 data = ticker.history(period=period_attempt)
+                print(f"🔍 Chart: History call completed for {symbol}, got {len(data) if not data.empty else 0} rows")
                 
                 if not data.empty and len(data) >= 30:  # Need at least 30 days for indicators
                     print(f"✅ Chart: Got {len(data)} days of REAL historical data for {symbol} ({period_attempt})")
+                    print(f"✅ Chart: Date range: {data.index[0]} to {data.index[-1]}")
+                    print(f"✅ Chart: Latest close: ${data['Close'].iloc[-1]:.2f}")
                     # Calculate technical indicators
                     data = self.calculate_indicators(data)
                     return data
                 else:
                     print(f"⚠️ Chart: Insufficient historical data for {symbol} with {period_attempt}: {len(data) if not data.empty else 0} days")
+                    if not data.empty:
+                        print(f"⚠️ Chart: Data columns: {list(data.columns)}")
                     
             except Exception as e:
                 print(f"⚠️ Chart: Failed to get {period_attempt} data for {symbol}: {e}")
