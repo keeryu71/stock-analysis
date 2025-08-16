@@ -507,6 +507,9 @@ MOBILE_TEMPLATE = """
                 }
                 
                 html += `<p style="font-size: 12px; color: #4CAF50; margin-bottom: 10px;">${statusText}</p>`;
+                html += `<p style="font-size: 11px; color: #666; margin-bottom: 15px; font-style: italic;">
+                    ⚠️ Note: Stock prices from free APIs may occasionally be stale. Please verify current prices with your broker for actual trading.
+                </p>`;
                 
                 data.results.forEach((stock, index) => {
                     if (stock.put_analysis && stock.put_analysis.length > 0) {
