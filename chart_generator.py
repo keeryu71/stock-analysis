@@ -115,7 +115,7 @@ class StockChartGenerator:
                 'ABT': 132.0, 'WMT': 100.0, 'HD': 390.0, 'PG': 154.0, 'KO': 70.0,
                 'PEP': 150.0, 'NKE': 77.0, 'MCD': 309.0, 'SBUX': 91.0, 'XOM': 106.0,
                 'CVX': 157.0, 'BA': 235.0, 'CAT': 408.0, 'GE': 268.0, 'PLTR': 177.0,
-                'HOOD': 114.0, 'COIN': 318.0, 'SOFI': 24.0, 'RIVN': 12.0, 'LCID': 2.0
+                'HOOD': 114.0, 'COIN': 318.0, 'SOFI': 24.0, 'RIVN': 12.24, 'LCID': 2.0
             }
             
             # Use real current price if available, otherwise use base price
