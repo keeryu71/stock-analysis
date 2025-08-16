@@ -132,8 +132,8 @@ class HybridStockAnalyzer:
             real_price = self.get_real_closing_price(symbol)
             
             if real_price is None:
-                print(f"⚠️ Using mock data for {symbol}")
-                return self.mock_analyzer.analyze_stock(symbol)
+                print(f"❌ Could not get real price for {symbol} - skipping (no mock fallback)")
+                return None
             
             # Step 2: Get historical data for indicators
             hist_data = self.get_historical_data_for_indicators(symbol, real_price)
@@ -208,9 +208,8 @@ class HybridStockAnalyzer:
             return result
             
         except Exception as e:
-            print(f"❌ Hybrid analysis failed for {symbol}: {e}")
-            # Fall back to mock data
-            return self.mock_analyzer.analyze_stock(symbol)
+            print(f"❌ Hybrid analysis failed for {symbol}: {e} - skipping (no mock fallback)")
+            return None
     
     def run_analysis(self):
         """Run hybrid analysis on all stocks."""

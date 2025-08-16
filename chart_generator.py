@@ -42,25 +42,54 @@ class StockChartGenerator:
         self.dpi = 100
         
     def fetch_chart_data(self, symbol, period='3mo'):
-        """Fetch data for charting with fallback to mock data."""
+        """Fetch REAL data for charting - no mock fallbacks."""
+        if not YFINANCE_AVAILABLE:
+            print(f"❌ yfinance not available - cannot generate real chart for {symbol}")
+            return None
+            
+        # Try multiple periods and methods to get real data
+        periods_to_try = ['3mo', '6mo', '1y', '2y', '5y']
+        
+        for period_attempt in periods_to_try:
+            try:
+                print(f"🔍 Attempting to fetch {period_attempt} data for {symbol}...")
+                ticker = yf.Ticker(symbol)
+                data = ticker.history(period=period_attempt)
+                
+                if not data.empty and len(data) >= 30:  # Need at least 30 days
+                    print(f"✅ Got {len(data)} days of REAL data for {symbol} ({period_attempt})")
+                    # Calculate technical indicators
+                    data = self.calculate_indicators(data)
+                    return data
+                else:
+                    print(f"⚠️ Insufficient data for {symbol} with {period_attempt}: {len(data) if not data.empty else 0} days")
+                    
+            except Exception as e:
+                print(f"⚠️ Failed to fetch {period_attempt} data for {symbol}: {e}")
+                continue
+        
+        # If all periods failed, try different approaches
         try:
-            if not YFINANCE_AVAILABLE:
-                return self.generate_mock_data(symbol)
-                
+            print(f"🔄 Trying alternative data fetch for {symbol}...")
             ticker = yf.Ticker(symbol)
-            data = ticker.history(period=period)
             
-            if data.empty:
-                print(f"No data from yfinance for {symbol}, using mock data")
-                return self.generate_mock_data(symbol)
+            # Try downloading with different parameters
+            import yfinance as yf
+            data = yf.download(symbol, period='1y', interval='1d', progress=False)
+            
+            if not data.empty and len(data) >= 30:
+                print(f"✅ Alternative method got {len(data)} days of REAL data for {symbol}")
+                # Rename columns to match expected format
+                if 'Adj Close' in data.columns:
+                    data['Close'] = data['Adj Close']
+                data = self.calculate_indicators(data)
+                return data
                 
-            # Calculate technical indicators
-            data = self.calculate_indicators(data)
-            return data
-            
         except Exception as e:
-            print(f"Error fetching chart data for {symbol}: {e}, using mock data")
-            return self.generate_mock_data(symbol)
+            print(f"⚠️ Alternative method failed for {symbol}: {e}")
+        
+        print(f"❌ Could not fetch ANY real data for {symbol} - refusing to use mock data")
+        return None
     
     def get_current_real_price(self, symbol):
         """Get current real price for anchoring mock data."""
