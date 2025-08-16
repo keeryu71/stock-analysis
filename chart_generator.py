@@ -62,13 +62,49 @@ class StockChartGenerator:
             print(f"Error fetching chart data for {symbol}: {e}, using mock data")
             return self.generate_mock_data(symbol)
     
+    def get_current_real_price(self, symbol):
+        """Get current real price for anchoring mock data."""
+        try:
+            if not YFINANCE_AVAILABLE:
+                return None
+                
+            ticker = yf.Ticker(symbol)
+            
+            # Try multiple methods to get current price
+            methods = [
+                lambda: ticker.history(period='1d')['Close'].iloc[-1],
+                lambda: ticker.history(period='2d')['Close'].iloc[-1],
+                lambda: ticker.info.get('currentPrice'),
+                lambda: ticker.info.get('regularMarketPrice'),
+                lambda: ticker.info.get('previousClose')
+            ]
+            
+            for method in methods:
+                try:
+                    price = method()
+                    if price and price > 0:
+                        print(f"✅ Got real current price for {symbol}: ${price:.2f}")
+                        return float(price)
+                except:
+                    continue
+                    
+            print(f"⚠️ Could not get real current price for {symbol}")
+            return None
+            
+        except Exception as e:
+            print(f"❌ Error getting current price for {symbol}: {e}")
+            return None
+    
     def generate_mock_data(self, symbol):
         """Generate mock stock data for demonstration."""
         try:
             # Generate 90 days of mock data
             dates = pd.date_range(end=datetime.now(), periods=90, freq='D')
             
-            # Realistic base prices for different stocks
+            # Try to get real current price first
+            current_real_price = self.get_current_real_price(symbol)
+            
+            # Realistic base prices for different stocks (fallback if real price not available)
             base_prices = {
                 'AAPL': 230.0, 'MSFT': 520.0, 'GOOGL': 204.0, 'AMZN': 231.0, 'NVDA': 180.0,
                 'META': 101.0, 'TSLA': 331.0, 'NFLX': 1239.0, 'AMD': 178.0, 'CRM': 242.0,
@@ -82,16 +118,32 @@ class StockChartGenerator:
                 'HOOD': 114.0, 'COIN': 318.0, 'SOFI': 24.0, 'RIVN': 12.0, 'LCID': 2.0
             }
             
-            base_price = base_prices.get(symbol, 150.0)  # Default to 150 if symbol not found
+            # Use real current price if available, otherwise use base price
+            if current_real_price:
+                target_price = current_real_price
+                print(f"📊 Using real current price for {symbol}: ${target_price:.2f}")
+            else:
+                target_price = base_prices.get(symbol, 150.0)
+                print(f"📊 Using fallback price for {symbol}: ${target_price:.2f}")
+            
             np.random.seed(hash(symbol) % 2**32)  # Consistent seed per symbol
             
-            # Generate price series with trend and volatility
-            returns = np.random.normal(0.001, 0.02, len(dates))  # Daily returns
-            prices = [base_price]
+            # Generate price series that ends at the target price
+            returns = np.random.normal(0.001, 0.02, len(dates) - 1)  # Daily returns for 89 days
             
-            for ret in returns[1:]:
+            # Start from a price that will allow us to reach target_price
+            start_price = target_price * (1 + np.random.uniform(-0.15, 0.15))  # Start within 15% of target
+            prices = [start_price]
+            
+            # Generate intermediate prices
+            for ret in returns:
                 new_price = prices[-1] * (1 + ret)
-                prices.append(max(new_price, 1.0))  # Ensure positive prices
+                prices.append(max(new_price, 0.1))  # Ensure positive prices
+            
+            # Force the last price to be exactly the target price
+            prices[-1] = target_price
+            
+            print(f"📈 Generated chart data for {symbol}: ${prices[0]:.2f} → ${prices[-1]:.2f}")
             
             # Create OHLC data
             data = pd.DataFrame(index=dates)
