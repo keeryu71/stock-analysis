@@ -96,10 +96,18 @@ class HybridStockAnalyzer:
                 # If no historical data, create synthetic data around current price
                 dates = pd.date_range(end=datetime.now(), periods=60, freq='D')
                 # Create realistic price movement around current price
-                price_changes = np.random.normal(0, 0.02, 60)  # 2% daily volatility
-                prices = [current_price]
-                for change in price_changes[:-1]:
+                price_changes = np.random.normal(0, 0.02, 59)  # 2% daily volatility for 59 days
+                prices = []
+                
+                # Start from 60 days ago and work forward to current price
+                start_price = current_price * (1 + np.random.uniform(-0.1, 0.1))  # Start within 10% of current
+                prices.append(start_price)
+                
+                for change in price_changes:
                     prices.append(prices[-1] * (1 + change))
+                
+                # Ensure the last price is exactly the current price
+                prices[-1] = current_price
                 
                 hist = pd.DataFrame({
                     'Close': prices,
