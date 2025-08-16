@@ -231,13 +231,13 @@ def get_all_charts():
     })
 
 @app.route('/generate/top', methods=['POST'])
-def generate_top_charts():
+def generate_top_charts_route():
     """Generate charts for top 10 stocks and top 10 options setups."""
     result = chart_service.generate_top_charts()
     return jsonify(result)
 
 @app.route('/generate/all', methods=['POST'])
-def generate_all_charts():
+def generate_all_charts_route():
     """Generate charts for all symbols."""
     result = chart_service.generate_all_charts()
     return jsonify(result)
@@ -245,6 +245,13 @@ def generate_all_charts():
 @app.route('/generate/<symbol>', methods=['POST'])
 def generate_chart(symbol):
     """Generate chart for a specific symbol."""
+    # Prevent conflicts with specific endpoints
+    if symbol.lower() in ['top', 'all']:
+        return jsonify({
+            'success': False,
+            'error': f'"{symbol}" is a reserved endpoint. Use /generate/{symbol.lower()} instead.'
+        }), 400
+    
     symbol = symbol.upper()
     
     chart_data = chart_service.generate_chart_for_symbol(symbol)
