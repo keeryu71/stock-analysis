@@ -74,9 +74,57 @@ class LocalChartService:
             print(f"❌ Error generating chart for {symbol}: {e}")
             return None
     
+    def generate_top_charts(self):
+        """Generate charts for top 10 stocks and top 10 options setups."""
+        print("🚀 Starting intelligent chart generation for top setups...")
+        
+        # Get top 10 stock setups
+        print("📈 Analyzing top stock setups...")
+        stock_results = self.stock_analyzer.run_analysis()
+        top_stocks = [result['symbol'] for result in stock_results[:10]]
+        
+        # Get top 10 options setups
+        print("💰 Analyzing top options setups...")
+        from hybrid_stock_analyzer import HybridOptionsAnalyzer
+        options_analyzer = HybridOptionsAnalyzer()
+        options_results = options_analyzer.run_real_time_analysis()
+        top_options = [result['symbol'] for result in options_results[:10]]
+        
+        # Combine and deduplicate
+        priority_symbols = list(dict.fromkeys(top_stocks + top_options))  # Preserves order, removes duplicates
+        
+        print(f"🎯 Priority symbols identified: {len(priority_symbols)} unique stocks")
+        print(f"   Top stocks: {', '.join(top_stocks)}")
+        print(f"   Top options: {', '.join(top_options)}")
+        
+        success_count = 0
+        
+        for i, symbol in enumerate(priority_symbols, 1):
+            print(f"📊 [{i}/{len(priority_symbols)}] Processing priority stock {symbol}...")
+            
+            result = self.generate_chart_for_symbol(symbol)
+            if result:
+                success_count += 1
+            
+            # Small delay to avoid overwhelming the system
+            time.sleep(0.5)
+        
+        self.last_update = datetime.now()
+        print(f"✅ Priority chart generation complete: {success_count}/{len(priority_symbols)} charts generated")
+        
+        return {
+            'success': True,
+            'generated': success_count,
+            'total': len(priority_symbols),
+            'priority_symbols': priority_symbols,
+            'top_stocks': top_stocks,
+            'top_options': top_options,
+            'timestamp': self.last_update.isoformat()
+        }
+    
     def generate_all_charts(self):
-        """Generate charts for all stocks."""
-        print("🚀 Starting bulk chart generation...")
+        """Generate charts for all stocks (fallback method)."""
+        print("🚀 Starting bulk chart generation for all stocks...")
         
         stocks = self.stock_analyzer.stocks
         success_count = 0

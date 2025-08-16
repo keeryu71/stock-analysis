@@ -92,26 +92,58 @@ def start_local_server():
         print(f"❌ Failed to start server: {e}")
         return None
 
-def generate_sample_charts():
-    """Generate charts for a few sample stocks."""
-    print("\n📊 Generating sample charts...")
+def generate_top_charts():
+    """Generate charts for top 10 stocks and top 10 options setups."""
+    print("\n📊 Generating charts for top setups...")
+    print("🔍 This will analyze all stocks and generate charts for the best opportunities")
     
-    sample_stocks = ['AAPL', 'MSFT', 'TSLA', 'CRM', 'NVDA']
-    
-    for stock in sample_stocks:
-        try:
-            print(f"📈 Generating chart for {stock}...")
-            response = requests.post(f"http://localhost:5001/generate/{stock}", timeout=30)
-            
-            if response.status_code == 200:
-                print(f"✅ {stock} chart generated")
-            else:
-                print(f"⚠️ {stock} chart failed: {response.status_code}")
-                
-        except Exception as e:
-            print(f"❌ Error generating {stock} chart: {e}")
+    try:
+        print("🚀 Starting intelligent chart generation...")
+        response = requests.post("http://localhost:5001/generate/top", timeout=120)  # Longer timeout for analysis
         
-        time.sleep(1)  # Small delay between requests
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('success'):
+                print(f"✅ Generated {data.get('generated', 0)} charts for top setups")
+                
+                if 'top_stocks' in data:
+                    print(f"📈 Top stocks: {', '.join(data['top_stocks'])}")
+                if 'top_options' in data:
+                    print(f"💰 Top options: {', '.join(data['top_options'])}")
+                
+                return True
+            else:
+                print("⚠️ Chart generation completed with issues")
+                return False
+        else:
+            print(f"❌ Chart generation failed: {response.status_code}")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Error generating top charts: {e}")
+        print("💡 Falling back to sample charts...")
+        
+        # Fallback to sample charts
+        sample_stocks = ['AAPL', 'MSFT', 'TSLA', 'CRM', 'NVDA']
+        success_count = 0
+        
+        for stock in sample_stocks:
+            try:
+                print(f"📈 Generating fallback chart for {stock}...")
+                response = requests.post(f"http://localhost:5001/generate/{stock}", timeout=30)
+                
+                if response.status_code == 200:
+                    print(f"✅ {stock} chart generated")
+                    success_count += 1
+                else:
+                    print(f"⚠️ {stock} chart failed: {response.status_code}")
+                    
+            except Exception as e:
+                print(f"❌ Error generating {stock} chart: {e}")
+            
+            time.sleep(1)  # Small delay between requests
+        
+        return success_count > 0
 
 def test_chart_access():
     """Test accessing generated charts."""

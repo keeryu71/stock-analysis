@@ -1146,11 +1146,12 @@ def api_get_chart(symbol):
         print(f"❌ All chart generation methods failed for {symbol}")
         return jsonify({
             'success': False,
-            'error': f'Chart generation failed for {symbol}. To enable charts: 1) Run local chart server: python local_chart_server.py, 2) Generate charts: POST http://localhost:5001/generate/all',
+            'error': f'Chart generation failed for {symbol}. To enable charts: 1) Run setup: python setup_local_charts.py, 2) Or generate top charts: POST http://localhost:5001/generate/top',
             'symbol': symbol.upper(),
             'help': {
-                'local_server': 'python local_chart_server.py',
-                'generate_charts': 'POST http://localhost:5001/generate/all',
+                'setup_script': 'python setup_local_charts.py',
+                'generate_top_charts': 'POST http://localhost:5001/generate/top',
+                'generate_all_charts': 'POST http://localhost:5001/generate/all',
                 'get_chart': f'GET http://localhost:5001/chart/{symbol.upper()}'
             }
         }), 500
